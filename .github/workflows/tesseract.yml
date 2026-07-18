@@ -1,71 +1,186 @@
 name: Tesseract automatisch aktualisieren
+
 on:
   workflow_dispatch:
     inputs:
       force:
-        description: Aktuelle Version erneut bauen
+        description: "Aktuelle Version erneut bauen"
         required: false
         default: false
         type: boolean
   schedule:
     - cron: "17 4 * * 1"
+
 permissions:
   contents: write
+
 concurrency:
   group: tesseract-update
   cancel-in-progress: false
+
 jobs:
-  update:
+  check-and-build:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Repository auschecken
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Version prüfen
+
+      - name: Neueste offizielle Tesseract-Version ermitteln
         id: version
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $r=Invoke-RestMethod -Uri 'https://api.github.com/repos/tesseract-ocr/tesseract/releases/latest' -Headers @{'Accept'='application/vnd.github+json';'Authorization'="Bearer $env:GH_TOKEN";'User-Agent'='MediaHub-Tools'}
-          $latest=$r.tag_name.TrimStart('v')
-          $f='.\packages\tesseract\current\VERSION'; $current=if(Test-Path $f){(Get-Content $f -Raw).Trim()}else{''}
-          $force='${{ inputs.force }}' -eq 'true'; $build=$force -or ($latest-ne$current)
-          "latest=$latest" >> $env:GITHUB_OUTPUT; "needs_build=$($build.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-          Write-Host "Offiziell: $latest / Bei uns: $current / Build: $build"
-      - name: Neue Version bauen und prüfen
+          $release = Invoke-RestMethod `
+            -Uri "https://api.github.com/repos/tesseract-ocr/tesseract/releases/latest" `
+            -Headers @{
+              "Accept" = "application/vnd.github+json"
+              "Authorization" = "Bearer $env:GH_TOKEN"
+              "User-Agent" = "MediaHub-Tools"
+            }
+
+          $latest = $release.tag_name.TrimStart("v")
+          $currentFile = ".\packages\tesseract\current\VERSION"
+          $current = if (Test-Path $currentFile) {
+            (Get-Content $currentFile -Raw).Trim()
+          } else {
+            ""
+          }
+
+          $force = "${{ inputs.force }}" -eq "true"
+          $needsBuild = $force -or ($latest -ne $current)
+
+          "latest=$latest" >> $env:GITHUB_OUTPUT
+          "current=$current" >> $env:GITHUB_OUTPUT
+          "needs_build=$($needsBuild.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Offiziell aktuell: $latest"
+          Write-Host "Bei uns aktuell:    $current"
+          Write-Host "Build erforderlich: $needsBuild"
+
+      - name: Nichts zu tun
+        if: steps.version.outputs.needs_build != 'true'
+        shell: powershell
+        run: |
+          Write-Host "Keine neue Tesseract-Version vorhanden."
+
+      - name: Neue Version bauen und vollständig prüfen
         if: steps.version.outputs.needs_build == 'true'
         shell: powershell
-        run: .\scripts\build_tesseract.ps1 -Version '${{ steps.version.outputs.latest }}'
-      - name: Release veröffentlichen
+        run: |
+          .\scripts\build_tesseract.ps1 `
+            -Version "${{ steps.version.outputs.latest }}"
+
+      - name: Vorhandenes gleichnamiges Release sicher entfernen
         if: steps.version.outputs.needs_build == 'true'
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $v='${{ steps.version.outputs.latest }}'; $tag="tesseract-v$v"
-          gh release delete $tag --yes 2>$null
-          git push origin ":refs/tags/$tag" 2>$null
-          gh release create $tag .\release\Tesseract-Projekt.zip .\release\Tesseract-Projekt.zip.sha256 .\release\manifest.json .\THIRD_PARTY_LICENSES.md --title "Tesseract OCR $v" --notes 'Automatisch aus dem offiziellen Tesseract-Quellcode gebaut. Alle Rechte und Lizenzen verbleiben bei den jeweiligen Entwicklern und Rechteinhabern.'
-      - name: current und previous erst nach erfolgreichem Release wechseln
+          $version = "${{ steps.version.outputs.latest }}"
+          $tag = "tesseract-v$version"
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Vorhandenes Release $tag wird ersetzt."
+            gh release delete $tag --yes --cleanup-tag
+            if ($LASTEXITCODE -ne 0) {
+              throw "Vorhandenes Release $tag konnte nicht gelöscht werden."
+            }
+          } else {
+            Write-Host "Noch kein Release $tag vorhanden."
+            $global:LASTEXITCODE = 0
+          }
+
+          git ls-remote --exit-code --tags origin "refs/tags/$tag" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Verbliebenen Remote-Tag $tag löschen."
+            git push origin ":refs/tags/$tag"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Remote-Tag $tag konnte nicht gelöscht werden."
+            }
+          } else {
+            $global:LASTEXITCODE = 0
+          }
+
+      - name: Neues GitHub-Release erstellen
         if: steps.version.outputs.needs_build == 'true'
         shell: powershell
-        run: .\scripts\rotate_tesseract.ps1 -Version '${{ steps.version.outputs.latest }}'
-      - name: Paketstände speichern
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = "${{ steps.version.outputs.latest }}"
+          $tag = "tesseract-v$version"
+
+          gh release create $tag `
+            .\release\Tesseract-Projekt.zip `
+            .\release\Tesseract-Projekt.zip.sha256 `
+            .\release\manifest.json `
+            .\THIRD_PARTY_LICENSES.md `
+            --title "Tesseract OCR $version" `
+            --notes "Automatisch aus dem offiziellen Tesseract-Quellcode gebaut. Alle Rechte und Lizenzen verbleiben bei den jeweiligen Tesseract-Entwicklern und Rechteinhabern. Enthalten sind die originalen Lizenztexte sowie deutsche und englische Sprachdaten."
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub-Release $tag konnte nicht erstellt werden."
+          }
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub-Release $tag wurde nach dem Erstellen nicht gefunden."
+          }
+
+      - name: Repository erst nach erfolgreichem Release rotieren
         if: steps.version.outputs.needs_build == 'true'
         shell: powershell
         run: |
-          git config user.name 'MediaHub Tools Bot'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          .\scripts\rotate_tesseract.ps1 `
+            -Version "${{ steps.version.outputs.latest }}"
+
+      - name: Aktuellen und vorherigen Stand einchecken
+        if: steps.version.outputs.needs_build == 'true'
+        shell: powershell
+        run: |
+          git config user.name "MediaHub Tools Bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git add packages/tesseract/current packages/tesseract/previous
-          git commit -m "Tesseract ${{ steps.version.outputs.latest }} bereitstellen"
-          git push origin main
-      - name: Nur zwei Releases behalten
+
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Keine Repository-Dateien zu aktualisieren."
+          } else {
+            $global:LASTEXITCODE = 0
+            git commit -m "Tesseract ${{ steps.version.outputs.latest }} bereitstellen"
+            git push origin main
+          }
+
+      - name: Nur zwei Tesseract-Releases behalten
         if: steps.version.outputs.needs_build == 'true'
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $rows=gh release list --limit 100 --json tagName,createdAt --jq '.[] | select(.tagName | startswith("tesseract-v")) | [.tagName,.createdAt] | @tsv'
-          $items=@($rows|%{$p=$_ -split "`t";[pscustomobject]@{Tag=$p[0];Created=[datetime]$p[1]}}|sort Created -Descending)
-          foreach($i in @($items|select -Skip 2)){gh release delete $i.Tag --yes --cleanup-tag}
+          $releases = gh release list `
+            --limit 100 `
+            --json tagName,createdAt `
+            --jq '.[] | select(.tagName | startswith("tesseract-v")) | [.tagName,.createdAt] | @tsv'
+
+          $items = @($releases | ForEach-Object {
+            $parts = $_ -split "`t"
+            [pscustomobject]@{
+              Tag = $parts[0]
+              CreatedAt = [datetime]$parts[1]
+            }
+          } | Sort-Object CreatedAt -Descending)
+
+          $old = @($items | Select-Object -Skip 2)
+          foreach ($item in $old) {
+            Write-Host "Altes Release löschen: $($item.Tag)"
+            gh release delete $item.Tag --yes --cleanup-tag
+            if ($LASTEXITCODE -ne 0) {
+              throw "Altes Release $($item.Tag) konnte nicht gelöscht werden."
+            }
+          }
