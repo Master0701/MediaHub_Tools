@@ -74,7 +74,7 @@ jobs:
           .\scripts\build_tesseract.ps1 `
             -Version "${{ steps.version.outputs.latest }}"
 
-      - name: Vorhandenes gleichnamiges Release sicher entfernen
+      - name: Gleichnamiges Release bei erzwungenem Neubau entfernen
         if: steps.version.outputs.needs_build == 'true'
         shell: powershell
         env:
@@ -83,8 +83,11 @@ jobs:
           $version = "${{ steps.version.outputs.latest }}"
           $tag = "tesseract-v$version"
 
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) {
+          $existingTags = @(
+            gh release list --limit 100 --json tagName --jq '.[].tagName'
+          )
+
+          if ($existingTags -contains $tag) {
             Write-Host "Vorhandenes Release $tag wird ersetzt."
             gh release delete $tag --yes --cleanup-tag
             if ($LASTEXITCODE -ne 0) {
@@ -92,18 +95,6 @@ jobs:
             }
           } else {
             Write-Host "Noch kein Release $tag vorhanden."
-            $global:LASTEXITCODE = 0
-          }
-
-          git ls-remote --exit-code --tags origin "refs/tags/$tag" *> $null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Verbliebenen Remote-Tag $tag löschen."
-            git push origin ":refs/tags/$tag"
-            if ($LASTEXITCODE -ne 0) {
-              throw "Remote-Tag $tag konnte nicht gelöscht werden."
-            }
-          } else {
-            $global:LASTEXITCODE = 0
           }
 
       - name: Neues GitHub-Release erstellen
@@ -127,10 +118,15 @@ jobs:
             throw "GitHub-Release $tag konnte nicht erstellt werden."
           }
 
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -ne 0) {
+          $createdTags = @(
+            gh release list --limit 100 --json tagName --jq '.[].tagName'
+          )
+
+          if ($createdTags -notcontains $tag) {
             throw "GitHub-Release $tag wurde nach dem Erstellen nicht gefunden."
           }
+
+          Write-Host "GitHub-Release $tag wurde erfolgreich erstellt."
 
       - name: Repository erst nach erfolgreichem Release rotieren
         if: steps.version.outputs.needs_build == 'true'
@@ -155,6 +151,9 @@ jobs:
             $global:LASTEXITCODE = 0
             git commit -m "Tesseract ${{ steps.version.outputs.latest }} bereitstellen"
             git push origin main
+            if ($LASTEXITCODE -ne 0) {
+              throw "Repository-Aktualisierung fehlgeschlagen."
+            }
           }
 
       - name: Nur zwei Tesseract-Releases behalten
