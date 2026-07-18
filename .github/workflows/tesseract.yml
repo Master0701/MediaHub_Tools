@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Repository auschecken
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -162,21 +162,34 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $releases = gh release list `
+          $releaseJson = gh release list `
             --limit 100 `
-            --json tagName,createdAt `
-            --jq '.[] | select(.tagName | startswith("tesseract-v")) | [.tagName,.createdAt] | @tsv'
+            --json tagName,createdAt
 
-          $items = @($releases | ForEach-Object {
-            $parts = $_ -split "`t"
-            [pscustomobject]@{
-              Tag = $parts[0]
-              CreatedAt = [datetime]$parts[1]
-            }
-          } | Sort-Object CreatedAt -Descending)
+          if ($LASTEXITCODE -ne 0) {
+            throw "Die GitHub-Releaseliste konnte nicht gelesen werden."
+          }
 
-          $old = @($items | Select-Object -Skip 2)
-          foreach ($item in $old) {
+          $items = @(
+            $releaseJson |
+              ConvertFrom-Json |
+              Where-Object { $_.tagName -like "tesseract-v*" } |
+              ForEach-Object {
+                [pscustomobject]@{
+                  Tag = $_.tagName
+                  CreatedAt = [datetime]$_.createdAt
+                }
+              } |
+              Sort-Object CreatedAt -Descending
+          )
+
+          $oldReleases = @($items | Select-Object -Skip 2)
+
+          if ($oldReleases.Count -eq 0) {
+            Write-Host "Es existieren höchstens zwei Tesseract-Releases. Nichts zu löschen."
+          }
+
+          foreach ($item in $oldReleases) {
             Write-Host "Altes Release löschen: $($item.Tag)"
             gh release delete $item.Tag --yes --cleanup-tag
             if ($LASTEXITCODE -ne 0) {
