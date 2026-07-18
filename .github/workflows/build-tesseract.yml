@@ -1,0 +1,68 @@
+name: Build Tesseract Tool
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tesseract-Version ohne v; leer = neuestes offizielles Release"
+        required: false
+        type: string
+  schedule:
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Tesseract-Paket bauen
+        shell: powershell
+        run: |
+          $version = "${{ inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            .\scripts\build_tesseract.ps1
+          } else {
+            .\scripts\build_tesseract.ps1 -Version $version
+          }
+
+      - name: Versionsinformationen lesen
+        id: info
+        shell: powershell
+        run: |
+          $info = Get-Content .\release\tesseract-release.json -Raw | ConvertFrom-Json
+          "version=$($info.version)" >> $env:GITHUB_OUTPUT
+          "package=$($info.package)" >> $env:GITHUB_OUTPUT
+
+      - name: Bereits vorhandenes Release prüfen
+        id: release_check
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "tesseract-v${{ steps.info.outputs.version }}"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            "exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "exists=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: GitHub-Release erstellen
+        if: steps.release_check.outputs.exists == 'false'
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "tesseract-v${{ steps.info.outputs.version }}"
+          gh release create $tag `
+            .\release\${{ steps.info.outputs.package }} `
+            .\release\${{ steps.info.outputs.package }}.sha256 `
+            .\release\tesseract-release.json `
+            --title "MediaHub Tesseract ${{ steps.info.outputs.version }}" `
+            --notes "Automatisch aus dem offiziellen Tesseract-Release erstellt. Enthält Tesseract OCR für Windows x64 sowie deutsche und englische Sprachdaten. Rechte und Lizenzen verbleiben bei den jeweiligen Originalprojekten."

@@ -1,0 +1,15 @@
+{
+  "id": "tesseract",
+  "display_name": "Tesseract OCR",
+  "source_repository": "tesseract-ocr/tesseract",
+  "language_repository": "tesseract-ocr/tessdata_fast",
+  "architecture": "x64",
+  "package_name": "Tesseract-Projekt.zip",
+  "languages": [
+    "deu",
+    "eng",
+    "osd"
+  ],
+  "license": "Apache-2.0",
+  "retained_versions": 2
+}
