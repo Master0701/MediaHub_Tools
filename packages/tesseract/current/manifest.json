@@ -1,0 +1,8 @@
+﻿{
+    "tool":  "tesseract",
+    "version":  "5.5.3",
+    "package":  "Tesseract-Projekt.zip",
+    "sha256":  "fb0e89722d3de78d1b4baf1ac63781345795224d2e0d2626a641870f23483dcd",
+    "release_tag":  "tesseract-v5.5.3",
+    "built_at_utc":  "2026-07-27T07:59:33.0848315Z"
+}
