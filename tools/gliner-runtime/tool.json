@@ -1,0 +1,28 @@
+﻿{
+  "id": "gliner-runtime",
+  "display_name": "GLiNER Runtime",
+  "source_repository": "urchade/GLiNER",
+  "model_repository": "urchade/gliner_multi-v2.1",
+  "architecture": "x64",
+  "platform": "windows",
+  "gliner_version": "0.2.29",
+  "torch_version_cpu": "2.14.0+cpu",
+  "torch_version_cuda": "2.14.0+cu126",
+  "cuda_version": "12.6",
+  "runtime_variants": [
+    {
+      "id": "cpu",
+      "package_name": "GLiNER-Runtime-Windows-x64-CPU.zip",
+      "acceleration": "cpu"
+    },
+    {
+      "id": "cuda",
+      "package_name": "GLiNER-Runtime-Windows-x64-CUDA.zip",
+      "acceleration": "nvidia-cuda"
+    }
+  ],
+  "automatic_variant_selection": true,
+  "cpu_fallback": true,
+  "license": "Apache-2.0",
+  "retained_versions": 2
+}

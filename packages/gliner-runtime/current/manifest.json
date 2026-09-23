@@ -1,0 +1,24 @@
+﻿{
+    "tool":  "gliner-runtime",
+    "version":  "0.2.29",
+    "platform":  "windows",
+    "architecture":  "x64",
+    "packages":  {
+                     "cpu":  {
+                                 "package":  "GLiNER-Runtime-Windows-x64-CPU.zip",
+                                 "sha256":  "7bccfd9dbfb5b2e59312385dbe3783f119e4939e3a219f021d8adb4522c5df01",
+                                 "torch_version":  "2.14.0+cpu",
+                                 "acceleration":  "cpu"
+                             },
+                     "cuda":  {
+                                  "package":  "GLiNER-Runtime-Windows-x64-CUDA.zip",
+                                  "sha256":  "8b03a95218d8e9ed0b5bc18bb69879a75b104cef3c3abe807c27e16225a3d59e",
+                                  "torch_version":  "2.14.0+cu126",
+                                  "cuda_version":  "12.6",
+                                  "acceleration":  "nvidia-cuda"
+                              }
+                 },
+    "source_project":  "urchade/GLiNER",
+    "source_model":  "urchade/gliner_multi-v2.1",
+    "built_at_utc":  "2026-09-22T16:02:57.7189989Z"
+}

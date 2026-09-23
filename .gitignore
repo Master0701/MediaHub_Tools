@@ -2,3 +2,7 @@ work/
 release/
 .vscode/
 *.tmp
+
+# GLiNER Runtime-Binaerpakete werden als GitHub-Release-Assets
+# veroeffentlicht und nicht im normalen Git-Repository gespeichert.
+packages/gliner-runtime/**/*.zip

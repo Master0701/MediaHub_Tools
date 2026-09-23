@@ -1,0 +1,191 @@
+﻿name: GLiNER Runtime veröffentlichen
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gliner-runtime-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Release-Metadaten prüfen
+        id: version
+        shell: powershell
+        run: |
+          $versionFile = ".\packages\gliner-runtime\current\VERSION"
+          $manifestFile = ".\packages\gliner-runtime\current\manifest.json"
+
+          if (-not (Test-Path $versionFile)) {
+            throw "VERSION fehlt."
+          }
+
+          if (-not (Test-Path $manifestFile)) {
+            throw "manifest.json fehlt."
+          }
+
+          $version = (Get-Content $versionFile -Raw -Encoding UTF8).Trim()
+          $manifest = Get-Content $manifestFile -Raw -Encoding UTF8 |
+            ConvertFrom-Json
+
+          if ($manifest.tool -ne "gliner-runtime") {
+            throw "Falsches Tool im Manifest."
+          }
+
+          if ($manifest.version -ne $version) {
+            throw "VERSION und Manifest-Version stimmen nicht überein."
+          }
+
+          $tag = "gliner-v$version"
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+          Write-Host "GLiNER-Version: $version"
+          Write-Host "Release-Tag:    $tag"
+
+      - name: Release-Dateien prüfen
+        shell: powershell
+        run: |
+          $root = ".\packages\gliner-runtime\current"
+
+          $required = @(
+            "GLiNER-Runtime-Windows-x64-CPU.zip",
+            "GLiNER-Runtime-Windows-x64-CPU.zip.sha256",
+            "GLiNER-Runtime-Windows-x64-CUDA.zip",
+            "GLiNER-Runtime-Windows-x64-CUDA.zip.sha256",
+            "manifest.json",
+            "VERSION"
+          )
+
+          foreach ($name in $required) {
+            $path = Join-Path $root $name
+
+            if (-not (Test-Path $path)) {
+              throw "Release-Datei fehlt: $path"
+            }
+          }
+
+          $manifest = Get-Content `
+            (Join-Path $root "manifest.json") `
+            -Raw -Encoding UTF8 |
+            ConvertFrom-Json
+
+          foreach ($variant in @("cpu", "cuda")) {
+            $entry = $manifest.packages.$variant
+            $zip = Join-Path $root $entry.package
+
+            $actualHash = (
+              Get-FileHash $zip -Algorithm SHA256
+            ).Hash.ToLowerInvariant()
+
+            if ($actualHash -ne $entry.sha256.ToLowerInvariant()) {
+              throw "SHA256-Prüfung fehlgeschlagen: $variant"
+            }
+
+            Write-Host "OK - $variant SHA256 stimmt."
+          }
+
+      - name: Gleichnamiges Release entfernen
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ steps.version.outputs.tag }}"
+
+          $existingTags = @(
+            gh release list --limit 100 --json tagName --jq '.[].tagName'
+          )
+
+          if ($existingTags -contains $tag) {
+            Write-Host "Vorhandenes Release $tag wird ersetzt."
+
+            gh release delete $tag --yes --cleanup-tag
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Vorhandenes Release $tag konnte nicht gelöscht werden."
+            }
+          }
+
+      - name: GitHub-Release erstellen
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $tag = "${{ steps.version.outputs.tag }}"
+          $root = ".\packages\gliner-runtime\current"
+
+          gh release create $tag `
+            "$root\GLiNER-Runtime-Windows-x64-CPU.zip" `
+            "$root\GLiNER-Runtime-Windows-x64-CPU.zip.sha256" `
+            "$root\GLiNER-Runtime-Windows-x64-CUDA.zip" `
+            "$root\GLiNER-Runtime-Windows-x64-CUDA.zip.sha256" `
+            "$root\manifest.json" `
+            "$root\VERSION" `
+            ".\THIRD_PARTY_LICENSES.md" `
+            --title "GLiNER Runtime $version" `
+            --notes "MediaHub GLiNER Runtime für Windows x64. Enthalten sind eine CPU-Variante sowie eine NVIDIA-CUDA-Variante. Die geeignete Laufzeit wird von MediaHub anhand der verfügbaren Hardware und Laufzeitfähigkeit ausgewählt. Drittanbieterrechte und Lizenzen verbleiben bei den jeweiligen Entwicklern und Rechteinhabern."
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub-Release $tag konnte nicht erstellt werden."
+          }
+
+          $createdTags = @(
+            gh release list --limit 100 --json tagName --jq '.[].tagName'
+          )
+
+          if ($createdTags -notcontains $tag) {
+            throw "GitHub-Release $tag wurde nach dem Erstellen nicht gefunden."
+          }
+
+          Write-Host "GitHub-Release $tag erfolgreich erstellt."
+
+      - name: Nur zwei GLiNER-Releases behalten
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $releaseJson = gh release list `
+            --limit 100 `
+            --json tagName,createdAt
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Die GitHub-Releaseliste konnte nicht gelesen werden."
+          }
+
+          $items = @(
+            $releaseJson |
+              ConvertFrom-Json |
+              Where-Object { $_.tagName -like "gliner-v*" } |
+              ForEach-Object {
+                [pscustomobject]@{
+                  Tag = $_.tagName
+                  CreatedAt = [datetime]$_.createdAt
+                }
+              } |
+              Sort-Object CreatedAt -Descending
+          )
+
+          $oldReleases = @($items | Select-Object -Skip 2)
+
+          foreach ($item in $oldReleases) {
+            Write-Host "Altes GLiNER-Release löschen: $($item.Tag)"
+
+            gh release delete $item.Tag --yes --cleanup-tag
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Altes Release $($item.Tag) konnte nicht gelöscht werden."
+            }
+          }
