@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)]
     [ValidateSet("cpu", "cuda")]
     [string]$Variant,
@@ -456,7 +456,148 @@ Write-Host ""
 Write-Host "========================================"
 Write-Host "BUILD-STAGING FERTIG"
 Write-Host "VARIANTE: $($Variant.ToUpper())"
-Write-Host "NOCH KEINE ZIP ERZEUGT"
+
+# ------------------------------------------------------------
+# Release-Paket erzeugen
+# ------------------------------------------------------------
+
+Write-Host ""
+Write-Host "Erzeuge Release-Paket..."
+
+# Windows PowerShell 5.1 laedt ZipFile nicht immer automatisch.
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$packageName = if ($Variant -eq "cuda") {
+    "GLiNER-Runtime-Windows-x64-CUDA.zip"
+}
+else {
+    "GLiNER-Runtime-Windows-x64-CPU.zip"
+}
+
+$packagePath = Join-Path $release $packageName
+$hashPath = "$packagePath.sha256"
+
+if (Test-Path $packagePath) {
+    Remove-Item $packagePath -Force
+}
+
+if (Test-Path $hashPath) {
+    Remove-Item $hashPath -Force
+}
+
+[System.IO.Compression.ZipFile]::CreateFromDirectory(
+    $work,
+    $packagePath,
+    [System.IO.Compression.CompressionLevel]::Optimal,
+    $false
+)
+
+if (-not (Test-Path $packagePath)) {
+    throw "Release-ZIP wurde nicht erzeugt: $packagePath"
+}
+
+$packageHash = (
+    Get-FileHash `
+        $packagePath `
+        -Algorithm SHA256
+).Hash.ToLowerInvariant()
+
+$hashLine = "$packageHash  $packageName"
+
+[System.IO.File]::WriteAllText(
+    $hashPath,
+    $hashLine + "`r`n",
+    [System.Text.Encoding]::ASCII
+)
+
+if (-not (Test-Path $hashPath)) {
+    throw "SHA256-Datei wurde nicht erzeugt: $hashPath"
+}
+
+$packageSize = (Get-Item $packagePath).Length
+
+Write-Host (
+    "ZIP: {0} ({1:N1} MB)" -f `
+    $packageName,
+    ($packageSize / 1MB)
+)
+
+Write-Host "SHA256: $packageHash"
+
+# ------------------------------------------------------------
+# ZIP-Inhalt kontrollieren
+# ------------------------------------------------------------
+
+Write-Host ""
+Write-Host "Pruefe ZIP-Inhalt..."
+
+$zip = [System.IO.Compression.ZipFile]::OpenRead($packagePath)
+
+try {
+    $zipEntries = @($zip.Entries)
+
+    if ($zipEntries.Count -eq 0) {
+        throw "Release-ZIP ist leer."
+    }
+
+    $requiredZipEntries = @(
+        "gliner/",
+        "torch/",
+        "transformers/",
+        "huggingface_hub/",
+        "tokenizers/",
+        "safetensors/",
+        "sentencepiece/",
+        "mediahub-runtime.json"
+    )
+
+    foreach ($requiredEntry in $requiredZipEntries) {
+
+        $found = @(
+            $zipEntries |
+            Where-Object {
+                $_.FullName.Replace("\", "/").StartsWith(
+                    $requiredEntry,
+                    [System.StringComparison]::OrdinalIgnoreCase
+                )
+            }
+        )
+
+        if ($found.Count -eq 0) {
+            throw "Pflichtinhalt fehlt im ZIP: $requiredEntry"
+        }
+
+        Write-Host "OK - $requiredEntry"
+    }
+
+    $forbiddenEntries = @(
+        $zipEntries |
+        Where-Object {
+            $name = $_.FullName.Replace("\", "/")
+
+            $name -match '(^|/)__pycache__(/|$)' -or
+            $name -match '(^|/)\.pytest_cache(/|$)' -or
+            $name -match '\.py[co]$'
+        }
+    )
+
+    if ($forbiddenEntries.Count -ne 0) {
+        throw (
+            "ZIP enthaelt unerlaubte Cache-/Bytecode-Dateien: " +
+            $forbiddenEntries.Count
+        )
+    }
+}
+finally {
+    $zip.Dispose()
+}
+
+Write-Host ""
+Write-Host "OK - Release-ZIP geprueft."
+Write-Host "Release: $packagePath"
+Write-Host "SHA256:  $hashPath"
+Write-Host "RELEASE-ZIP + SHA256 ERZEUGT"
 Write-Host "========================================"
 
 

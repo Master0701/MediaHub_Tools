@@ -18,7 +18,14 @@ $TorchVersionCUDA = "2.14.0+cu126"
 $TorchIndexCPU = "https://download.pytorch.org/whl/cpu"
 $TorchIndexCUDA = "https://download.pytorch.org/whl/cu126"
 
-$destinationPath = [System.IO.Path]::GetFullPath($Destination)
+if ([System.IO.Path]::IsPathRooted($Destination)) {
+    $destinationPath = [System.IO.Path]::GetFullPath($Destination)
+}
+else {
+    $destinationPath = [System.IO.Path]::GetFullPath(
+        (Join-Path (Get-Location).Path $Destination)
+    )
+}
 
 Write-Host "========================================"
 Write-Host "MediaHub GLiNER Source Preparation"
@@ -176,4 +183,5 @@ Write-Host "========================================"
 Write-Host "Variant: $Variant"
 Write-Host "Source:  $destinationPath"
 Write-Host "========================================"
+
 
