@@ -7,3 +7,4 @@ release/
 # veroeffentlicht und nicht im normalen Git-Repository gespeichert.
 packages/gliner-runtime/**/*.zip
 temp/
+packages/gliner-runtime/**/*.zip.part*

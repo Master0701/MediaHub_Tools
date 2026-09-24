@@ -597,6 +597,150 @@ Write-Host ""
 Write-Host "OK - Release-ZIP geprueft."
 Write-Host "Release: $packagePath"
 Write-Host "SHA256:  $hashPath"
+
+# ------------------------------------------------------------
+# CUDA-Release fuer GitHub in mehrere Assets aufteilen
+# ------------------------------------------------------------
+
+if ($Variant -eq "cuda") {
+
+    Write-Host ""
+    Write-Host "Erzeuge CUDA-Multipart-Release..."
+
+    [int64]$partSize = 1536MB
+
+    Get-ChildItem `
+        -LiteralPath $release `
+        -File `
+        -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -like "$packageName.part*"
+        } |
+        Remove-Item -Force
+
+    $sourceStream = [System.IO.File]::OpenRead($packagePath)
+
+    try {
+
+        $buffer = New-Object byte[] (8MB)
+        $partNumber = 1
+
+        while ($sourceStream.Position -lt $sourceStream.Length) {
+
+            $partName = (
+                "{0}.part{1:D3}" -f `
+                $packageName,
+                $partNumber
+            )
+
+            $partPath = Join-Path `
+                $release `
+                $partName
+
+            Write-Host "Erzeuge $partName ..."
+
+            $partStream = [System.IO.File]::Create($partPath)
+
+            try {
+
+                [int64]$written = 0
+
+                while (
+                    $written -lt $partSize -and
+                    $sourceStream.Position -lt $sourceStream.Length
+                ) {
+
+                    [int]$remaining = [int][Math]::Min(
+                        [int64]$buffer.Length,
+                        [int64]($partSize - $written)
+                    )
+
+                    $read = $sourceStream.Read(
+                        $buffer,
+                        0,
+                        $remaining
+                    )
+
+                    if ($read -le 0) {
+                        break
+                    }
+
+                    $partStream.Write(
+                        $buffer,
+                        0,
+                        $read
+                    )
+
+                    $written += $read
+                }
+            }
+            finally {
+                $partStream.Dispose()
+            }
+
+            $partHash = (
+                Get-FileHash `
+                    -LiteralPath $partPath `
+                    -Algorithm SHA256
+            ).Hash.ToLowerInvariant()
+
+            $partHashPath = "$partPath.sha256"
+
+            [System.IO.File]::WriteAllText(
+                $partHashPath,
+                "$partHash  $partName`r`n",
+                [System.Text.Encoding]::ASCII
+            )
+
+            Write-Host (
+                "OK - {0} ({1:N1} MB)" -f `
+                $partName,
+                ((Get-Item -LiteralPath $partPath).Length / 1MB)
+            )
+
+            Write-Host "SHA256: $partHash"
+
+            $partNumber++
+        }
+    }
+    finally {
+        $sourceStream.Dispose()
+    }
+
+    $parts = @(
+        Get-ChildItem `
+            -LiteralPath $release `
+            -File |
+        Where-Object {
+            $_.Name -match (
+                "^" +
+                [regex]::Escape($packageName) +
+                "\.part\d{3}$"
+            )
+        } |
+        Sort-Object Name
+    )
+
+    if ($parts.Count -lt 2) {
+        throw "CUDA-Multipart erzeugte nur $($parts.Count) Part(s)."
+    }
+
+    foreach ($part in $parts) {
+
+        if ($part.Length -ge 2GB) {
+            throw "CUDA-Part zu gross: $($part.Name)"
+        }
+
+        if (-not (Test-Path -LiteralPath "$($part.FullName).sha256")) {
+            throw "SHA256 fehlt fuer $($part.Name)"
+        }
+    }
+
+    Write-Host ""
+    Write-Host "CUDA-Parts: $($parts.Count)"
+    Write-Host "CUDA-MULTIPART + SHA256 ERZEUGT"
+}
+
 Write-Host "RELEASE-ZIP + SHA256 ERZEUGT"
 Write-Host "========================================"
 
