@@ -34,4 +34,4 @@ $Test=Join-Path $Work 'zip-test'; Expand-Archive $Zip $Test -Force
 foreach($r in @('tesseract.exe','manifest.json','LICENSE-TESSERACT.txt','LICENSE-TESSDATA_FAST.txt','tessdata\deu.traineddata','tessdata\eng.traineddata','tessdata\osd.traineddata')){if(-not(Test-Path(Join-Path $Test $r))){throw "ZIP-Prüfung fehlgeschlagen: $r fehlt."}}
 & (Join-Path $Test 'tesseract.exe') --version|Out-Host; if($LASTEXITCODE-ne 0){throw 'ZIP-Programmtest fehlgeschlagen.'}
 $Hash=(Get-FileHash $Zip -Algorithm SHA256).Hash.ToLowerInvariant(); "$Hash  Tesseract-Projekt.zip"|Set-Content (Join-Path $Release 'Tesseract-Projekt.zip.sha256') -Encoding ASCII
-[ordered]@{tool='tesseract';version=$tag;package='Tesseract-Projekt.zip';sha256=$Hash;release_tag="tesseract-v$tag";built_at_utc=(Get-Date).ToUniversalTime().ToString('o')}|ConvertTo-Json|Set-Content (Join-Path $Release 'manifest.json') -Encoding UTF8
+[ordered]@{tool='tesseract';version=$tag;package='Tesseract-Projekt.zip';sha256=$Hash;release_tag="mediahub-tools";built_at_utc=(Get-Date).ToUniversalTime().ToString('o')}|ConvertTo-Json|Set-Content (Join-Path $Release 'manifest.json') -Encoding UTF8

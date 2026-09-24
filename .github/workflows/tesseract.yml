@@ -44,6 +44,7 @@ jobs:
 
           $latest = $release.tag_name.TrimStart("v")
           $currentFile = ".\packages\tesseract\current\VERSION"
+
           $current = if (Test-Path $currentFile) {
             (Get-Content $currentFile -Raw).Trim()
           } else {
@@ -74,59 +75,104 @@ jobs:
           .\scripts\build_tesseract.ps1 `
             -Version "${{ steps.version.outputs.latest }}"
 
-      - name: Gleichnamiges Release bei erzwungenem Neubau entfernen
+      - name: Tesseract-Assets im gemeinsamen Release aktualisieren
         if: steps.version.outputs.needs_build == 'true'
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $tag = "mediahub-tools"
           $version = "${{ steps.version.outputs.latest }}"
-          $tag = "tesseract-v$version"
 
-          $existingTags = @(
-            gh release list --limit 100 --json tagName --jq '.[].tagName'
-          )
-
-          if ($existingTags -contains $tag) {
-            Write-Host "Vorhandenes Release $tag wird ersetzt."
-            gh release delete $tag --yes --cleanup-tag
-            if ($LASTEXITCODE -ne 0) {
-              throw "Vorhandenes Release $tag konnte nicht gelöscht werden."
-            }
-          } else {
-            Write-Host "Noch kein Release $tag vorhanden."
-          }
-
-      - name: Neues GitHub-Release erstellen
-        if: steps.version.outputs.needs_build == 'true'
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $version = "${{ steps.version.outputs.latest }}"
-          $tag = "tesseract-v$version"
-
-          gh release create $tag `
-            .\release\Tesseract-Projekt.zip `
-            .\release\Tesseract-Projekt.zip.sha256 `
-            .\release\manifest.json `
-            .\THIRD_PARTY_LICENSES.md `
-            --title "Tesseract OCR $version" `
-            --notes "Automatisch aus dem offiziellen Tesseract-Quellcode gebaut. Alle Rechte und Lizenzen verbleiben bei den jeweiligen Tesseract-Entwicklern und Rechteinhabern. Enthalten sind die originalen Lizenztexte sowie deutsche und englische Sprachdaten."
+          $releaseJson = gh release view $tag `
+            --json tagName,assets
 
           if ($LASTEXITCODE -ne 0) {
-            throw "GitHub-Release $tag konnte nicht erstellt werden."
+            throw "Gemeinsames Release $tag wurde nicht gefunden."
           }
 
-          $createdTags = @(
-            gh release list --limit 100 --json tagName --jq '.[].tagName'
+          $release = $releaseJson | ConvertFrom-Json
+
+          $protectedBefore = @(
+            $release.assets |
+              Where-Object {
+                $_.name -notin @(
+                  "Tesseract-Projekt.zip",
+                  "Tesseract-Projekt.zip.sha256",
+                  "tesseract-manifest.json"
+                )
+              } |
+              ForEach-Object { $_.name } |
+              Sort-Object
           )
 
-          if ($createdTags -notcontains $tag) {
-            throw "GitHub-Release $tag wurde nach dem Erstellen nicht gefunden."
+          Write-Host "Nicht-Tesseract-Assets vor Update:"
+
+          foreach ($name in $protectedBefore) {
+            Write-Host " - $name"
           }
 
-          Write-Host "GitHub-Release $tag wurde erfolgreich erstellt."
+          Copy-Item `
+            ".\release\manifest.json" `
+            ".\release\tesseract-manifest.json" `
+            -Force
+
+          gh release upload $tag `
+            ".\release\Tesseract-Projekt.zip" `
+            ".\release\Tesseract-Projekt.zip.sha256" `
+            ".\release\tesseract-manifest.json" `
+            --clobber
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Tesseract-Assets konnten nicht aktualisiert werden."
+          }
+
+          $afterJson = gh release view $tag `
+            --json assets
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Release konnte nach dem Upload nicht geprüft werden."
+          }
+
+          $after = $afterJson | ConvertFrom-Json
+
+          $namesAfter = @(
+            $after.assets |
+              ForEach-Object { $_.name }
+          )
+
+          foreach ($required in @(
+            "Tesseract-Projekt.zip",
+            "Tesseract-Projekt.zip.sha256",
+            "tesseract-manifest.json"
+          )) {
+            if ($required -notin $namesAfter) {
+              throw "Tesseract-Asset fehlt nach Upload: $required"
+            }
+          }
+
+          $protectedAfter = @(
+            $after.assets |
+              Where-Object {
+                $_.name -notin @(
+                  "Tesseract-Projekt.zip",
+                  "Tesseract-Projekt.zip.sha256",
+                  "tesseract-manifest.json"
+                )
+              } |
+              ForEach-Object { $_.name } |
+              Sort-Object
+          )
+
+          if (
+            (Compare-Object $protectedBefore $protectedAfter).Count -ne 0
+          ) {
+            throw "STOP: Nicht-Tesseract-Assets wurden verändert."
+          }
+
+          Write-Host ""
+          Write-Host "OK - Tesseract $version aktualisiert."
+          Write-Host "OK - GLiNER und alle anderen Assets blieben erhalten."
 
       - name: Repository erst nach erfolgreichem Release rotieren
         if: steps.version.outputs.needs_build == 'true'
@@ -145,54 +191,16 @@ jobs:
           git add packages/tesseract/current packages/tesseract/previous
 
           git diff --cached --quiet
+
           if ($LASTEXITCODE -eq 0) {
             Write-Host "Keine Repository-Dateien zu aktualisieren."
           } else {
             $global:LASTEXITCODE = 0
+
             git commit -m "Tesseract ${{ steps.version.outputs.latest }} bereitstellen"
             git push origin main
+
             if ($LASTEXITCODE -ne 0) {
               throw "Repository-Aktualisierung fehlgeschlagen."
-            }
-          }
-
-      - name: Nur zwei Tesseract-Releases behalten
-        if: steps.version.outputs.needs_build == 'true'
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $releaseJson = gh release list `
-            --limit 100 `
-            --json tagName,createdAt
-
-          if ($LASTEXITCODE -ne 0) {
-            throw "Die GitHub-Releaseliste konnte nicht gelesen werden."
-          }
-
-          $items = @(
-            $releaseJson |
-              ConvertFrom-Json |
-              Where-Object { $_.tagName -like "tesseract-v*" } |
-              ForEach-Object {
-                [pscustomobject]@{
-                  Tag = $_.tagName
-                  CreatedAt = [datetime]$_.createdAt
-                }
-              } |
-              Sort-Object CreatedAt -Descending
-          )
-
-          $oldReleases = @($items | Select-Object -Skip 2)
-
-          if ($oldReleases.Count -eq 0) {
-            Write-Host "Es existieren höchstens zwei Tesseract-Releases. Nichts zu löschen."
-          }
-
-          foreach ($item in $oldReleases) {
-            Write-Host "Altes Release löschen: $($item.Tag)"
-            gh release delete $item.Tag --yes --cleanup-tag
-            if ($LASTEXITCODE -ne 0) {
-              throw "Altes Release $($item.Tag) konnte nicht gelöscht werden."
             }
           }
