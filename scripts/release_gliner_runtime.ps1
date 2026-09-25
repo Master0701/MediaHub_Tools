@@ -415,7 +415,10 @@ Write-Host ""
 $releaseFiles = @(
     ".github/workflows/gliner.yml",
     ".gitignore",
+    "packages/gliner-runtime/current/VERSION",
     "packages/gliner-runtime/current/manifest.json",
+    "packages/gliner-runtime/current/GLiNER-Runtime-Windows-x64-CPU.zip.sha256",
+    "packages/gliner-runtime/current/GLiNER-Runtime-Windows-x64-CUDA.zip.sha256",
     "scripts/prepare_gliner_source.ps1",
     "scripts/build_gliner_runtime.ps1",
     "scripts/release_gliner_runtime.ps1"
