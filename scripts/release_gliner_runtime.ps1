@@ -51,10 +51,8 @@ if ($manifest.version -ne $version) {
     throw "VERSION und Manifest stimmen nicht ueberein."
 }
 
-$tag = "gliner-v$version"
 
 Write-Host "Version: $version"
-Write-Host "Tag:     $tag"
 Write-Host ""
 
 # ------------------------------------------------------------
@@ -314,7 +312,7 @@ Write-Host ""
 Write-Host "========================================"
 Write-Host "PREFLIGHT ERFOLGREICH"
 Write-Host "VERSION: $version"
-Write-Host "TAG:     $tag"
+Write-Host "RELEASE: mediahub-tools"
 Write-Host ""
 Write-Host "NICHTS COMMITTET"
 Write-Host "NICHTS GEPUSHT"
@@ -371,45 +369,47 @@ if ($localHead -ne $remoteHead) {
     throw "STOP: main und origin/main unterscheiden sich."
 }
 
-$localTag = @(
-    git tag -l $tag
-)
+$sharedTag = "mediahub-tools"
 
-if ($localTag.Count -gt 0) {
-    throw "STOP: Lokaler Tag existiert bereits: $tag"
-}
+Write-Host ""
+Write-Host "=== GEMEINSAMER GITHUB RELEASE ==="
+Write-Host "Tag: $sharedTag"
 
-$remoteTag = @(
-    git ls-remote `
-        --tags origin `
-        "refs/tags/$tag"
-)
+$releaseJson = gh release view $sharedTag --json tagName,assets
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Remote-Tag-Pruefung fehlgeschlagen."
+    throw "STOP: Gemeinsamer Release $sharedTag wurde nicht gefunden."
 }
 
-if ($remoteTag.Count -gt 0) {
-    throw "STOP: Remote-Tag existiert bereits: $tag"
-}
+$sharedRelease = $releaseJson | ConvertFrom-Json
 
-$oldPreference = $ErrorActionPreference
-$ErrorActionPreference = "Continue"
+$glinerAssetNames = @(
+    "GLiNER-Runtime-Windows-x64-CPU.zip",
+    "GLiNER-Runtime-Windows-x64-CPU.zip.sha256",
+    "GLiNER-Runtime-Windows-x64-CUDA.zip.part001",
+    "GLiNER-Runtime-Windows-x64-CUDA.zip.part001.sha256",
+    "GLiNER-Runtime-Windows-x64-CUDA.zip.part002",
+    "GLiNER-Runtime-Windows-x64-CUDA.zip.part002.sha256",
+    "gliner-manifest.json"
+)
 
-$null = gh release view $tag `
-    --json tagName `
-    2>$null
+$protectedBefore = @(
+    $sharedRelease.assets |
+        Where-Object {
+            $_.name -notin $glinerAssetNames
+        } |
+        ForEach-Object {
+            $_.name
+        } |
+        Sort-Object
+)
 
-$releaseViewExit = $LASTEXITCODE
-
-$ErrorActionPreference = $oldPreference
-
-if ($releaseViewExit -eq 0) {
-    throw "STOP: GitHub Release existiert bereits: $tag"
-}
-
-Write-Host "OK - Release-Ziel ist frei."
 Write-Host ""
+Write-Host "=== NICHT-GLINER-ASSETS VOR UPDATE ==="
+
+foreach ($name in $protectedBefore) {
+    Write-Host " - $name"
+}
 
 # Nur die vorgesehenen Dateien committen.
 $releaseFiles = @(
@@ -421,13 +421,15 @@ $releaseFiles = @(
     "packages/gliner-runtime/current/GLiNER-Runtime-Windows-x64-CUDA.zip.sha256",
     "scripts/prepare_gliner_source.ps1",
     "scripts/build_gliner_runtime.ps1",
-    "scripts/release_gliner_runtime.ps1"
+    "scripts/release_gliner_runtime.ps1",
+    "tools/gliner-runtime/tool.json",
+    "tools/gliner-runtime/VERSION"
 )
 
+Write-Host ""
 Write-Host "=== RELEASE-DATEIEN ==="
 
 foreach ($file in $releaseFiles) {
-
     $fullPath = Join-Path $repo $file
 
     if (-not (Test-Path -LiteralPath $fullPath)) {
@@ -456,9 +458,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $stagedFiles = @(
-    git diff `
-        --cached `
-        --name-only
+    git diff --cached --name-only
 )
 
 $unexpected = @(
@@ -469,7 +469,6 @@ $unexpected = @(
 )
 
 if ($unexpected.Count -gt 0) {
-
     git reset
 
     throw (
@@ -485,14 +484,13 @@ if ($stagedFiles.Count -eq 0) {
 Write-Host ""
 Write-Host "OK - nur vorgesehene Dateien staged."
 
-$commitMessage = "Prepare GLiNER runtime $version multipart release"
+$commitMessage = "Update GLiNER runtime $version in shared tools release"
 
 Write-Host ""
 Write-Host "Commit:"
 Write-Host $commitMessage
 
-git commit `
-    -m $commitMessage
+git commit -m $commitMessage
 
 if ($LASTEXITCODE -ne 0) {
     throw "Git-Commit fehlgeschlagen."
@@ -516,8 +514,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $remoteAfterPush = (
-    git ls-remote origin `
-        "refs/heads/main"
+    git ls-remote origin "refs/heads/main"
 ).Split()[0]
 
 if ($remoteAfterPush -ne $releaseCommit) {
@@ -527,83 +524,14 @@ if ($remoteAfterPush -ne $releaseCommit) {
 Write-Host "OK - Release-Commit ist auf origin/main."
 
 Write-Host ""
-Write-Host "Tag erzeugen: $tag"
+Write-Host "=== GLINER-ASSETS VORBEREITEN ==="
 
-git tag `
-    -a $tag `
-    -m "GLiNER Runtime $version"
+$sharedManifestPath = Join-Path $releaseRoot "gliner-manifest.json"
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Tag konnte nicht erzeugt werden."
-}
-
-git push origin $tag
-
-if ($LASTEXITCODE -ne 0) {
-    throw "Tag konnte nicht gepusht werden."
-}
-
-Write-Host "OK - Tag gepusht."
-
-# ------------------------------------------------------------
-# Release Notes
-# ------------------------------------------------------------
-
-$notesPath = Join-Path `
-    $repo `
-    "temp\gliner-release-notes-$version.md"
-
-$notesDir = Split-Path -Parent $notesPath
-
-New-Item `
-    -ItemType Directory `
-    -Path $notesDir `
-    -Force |
-    Out-Null
-
-$notes = @"
-# GLiNER Runtime $version
-
-MediaHub GLiNER Runtime fuer Windows x64.
-
-## CPU
-
-- Vollstaendiges CPU-Runtime-Paket
-- SHA256-Pruefsumme enthalten
-
-## CUDA
-
-Die CUDA-Runtime wird wegen der GitHub-Assetgroesse als Multipart-Paket bereitgestellt.
-
-Die Dateien muessen in der angegebenen Reihenfolge zusammengesetzt werden:
-
-$(
-    (
-        $parts |
-        ForEach-Object {
-            "- ``$($_.file)``"
-        }
-    ) -join "`r`n"
-)
-
-Rekonstruierte Datei:
-
-- ``$($cuda.package)``
-- Groesse: $($cuda.size) Bytes
-- SHA256: ``$($cuda.sha256)``
-
-Das MediaHub-GLiNER-Plugin uebernimmt spaeter Download,
-Pruefung und Zusammensetzen der Parts automatisch.
-"@
-
-[System.IO.File]::WriteAllText(
-    $notesPath,
-    $notes + "`r`n",
-    [System.Text.UTF8Encoding]::new($false)
-)
-
-Write-Host ""
-Write-Host "=== GITHUB RELEASE ERSTELLEN ==="
+Copy-Item `
+    -LiteralPath $manifestPath `
+    -Destination $sharedManifestPath `
+    -Force
 
 $releaseAssets = @(
     $cpuPath,
@@ -617,41 +545,92 @@ foreach ($entry in $parts) {
     $releaseAssets += "$partPath.sha256"
 }
 
-$releaseAssets += $manifestPath
-$releaseAssets += $versionPath
-$releaseAssets += $licensePath
+$releaseAssets += $sharedManifestPath
 
 if ($releaseAssets -contains $forbiddenCudaZip) {
     throw "STOP: Grosse CUDA-ZIP befindet sich in Release-Assets."
 }
 
+Write-Host ""
+Write-Host "=== GLINER IN MEDIAHUB-TOOLS AKTUALISIEREN ==="
+
 $ghArgs = @(
     "release",
-    "create",
-    $tag,
-    "--title",
-    "GLiNER Runtime $version",
-    "--notes-file",
-    $notesPath,
-    "--verify-tag"
+    "upload",
+    $sharedTag
 )
 
 $ghArgs += $releaseAssets
+$ghArgs += "--clobber"
 
 & gh @ghArgs
 
 if ($LASTEXITCODE -ne 0) {
-    throw "GitHub Release konnte nicht erstellt werden."
+    throw "GLiNER-Assets konnten nicht aktualisiert werden."
 }
 
 Write-Host ""
-Write-Host "=== RELEASE VERIFIZIEREN ==="
+Write-Host "=== GEMEINSAMEN RELEASE PRUEFEN ==="
 
-gh release view $tag `
-    --json tagName,name,isDraft,isPrerelease,url
+$afterJson = gh release view $sharedTag --json assets
 
 if ($LASTEXITCODE -ne 0) {
-    throw "GitHub Release konnte nach Erstellung nicht gelesen werden."
+    throw "Gemeinsamer Release konnte nach Upload nicht gelesen werden."
+}
+
+$after = $afterJson | ConvertFrom-Json
+
+$namesAfter = @(
+    $after.assets |
+        ForEach-Object {
+            $_.name
+        }
+)
+
+foreach ($required in $glinerAssetNames) {
+    if ($required -notin $namesAfter) {
+        throw "GLiNER-Asset fehlt nach Upload: $required"
+    }
+}
+
+$protectedAfter = @(
+    $after.assets |
+        Where-Object {
+            $_.name -notin $glinerAssetNames
+        } |
+        ForEach-Object {
+            $_.name
+        } |
+        Sort-Object
+)
+
+if ((Compare-Object $protectedBefore $protectedAfter).Count -ne 0) {
+    throw "STOP: Nicht-GLiNER-Assets wurden veraendert."
+}
+
+$requiredSharedAssets = @(
+    "Tesseract-Projekt.zip",
+    "Tesseract-Projekt.zip.sha256",
+    "tesseract-manifest.json",
+    "GLiNER-Runtime-Windows-x64-CPU.zip",
+    "GLiNER-Runtime-Windows-x64-CPU.zip.sha256",
+    "GLiNER-Runtime-Windows-x64-CUDA.zip.part001",
+    "GLiNER-Runtime-Windows-x64-CUDA.zip.part001.sha256",
+    "GLiNER-Runtime-Windows-x64-CUDA.zip.part002",
+    "GLiNER-Runtime-Windows-x64-CUDA.zip.part002.sha256",
+    "gliner-manifest.json",
+    "THIRD_PARTY_LICENSES.md"
+)
+
+Write-Host ""
+Write-Host "=== GESAMTER RELEASE-SOLLBESTAND ==="
+
+foreach ($required in $requiredSharedAssets) {
+    if ($required -notin $namesAfter) {
+        throw "STOP: Gemeinsames Release-Asset fehlt: $required"
+    }
+
+    Write-Host "OK: $required"
 }
 
 Write-Host ""
@@ -663,6 +642,7 @@ Write-Host ""
 Write-Host "========================================"
 Write-Host "GLINER RELEASE ERFOLGREICH"
 Write-Host "VERSION: $version"
-Write-Host "TAG:     $tag"
+Write-Host "RELEASE: $sharedTag"
 Write-Host "COMMIT:  $releaseCommit"
+Write-Host "TESSERACT UND ANDERE ASSETS: ERHALTEN"
 Write-Host "========================================"

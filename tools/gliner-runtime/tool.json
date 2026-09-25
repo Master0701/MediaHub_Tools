@@ -1,11 +1,11 @@
-﻿{
+{
   "id": "gliner-runtime",
   "display_name": "GLiNER Runtime",
   "source_repository": "urchade/GLiNER",
   "model_repository": "urchade/gliner_multi-v2.1",
   "architecture": "x64",
   "platform": "windows",
-  "gliner_version": "0.2.29",
+  "gliner_version": "0.2.30",
   "torch_version_cpu": "2.14.0+cpu",
   "torch_version_cuda": "2.14.0+cu126",
   "cuda_version": "12.6",

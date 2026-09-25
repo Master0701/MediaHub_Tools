@@ -12,6 +12,19 @@ $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
 $work = Join-Path $repo "work\gliner-runtime\$Variant"
 $release = Join-Path $repo "release\gliner-runtime"
+$GlinerVersionFile = Join-Path $repo "tools\gliner-runtime\VERSION"
+
+if (-not (Test-Path -LiteralPath $GlinerVersionFile)) {
+    throw "GLiNER VERSION-Datei fehlt: $GlinerVersionFile"
+}
+
+$GlinerVersion = (
+    Get-Content -LiteralPath $GlinerVersionFile -Raw -Encoding UTF8
+).Trim()
+
+if ([string]::IsNullOrWhiteSpace($GlinerVersion)) {
+    throw "GLiNER VERSION-Datei ist leer."
+}
 
 if (-not (Test-Path $Source)) {
     throw "Quell-Runtime fehlt: $Source"
@@ -427,7 +440,7 @@ $manifest = [ordered]@{
     variant = $Variant
     platform = "windows"
     architecture = "x64"
-    gliner_version = "0.2.29"
+    gliner_version = $GlinerVersion
     torch_version = $torchVersion
     acceleration = $acceleration
     source_project = "urchade/GLiNER"

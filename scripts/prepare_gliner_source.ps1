@@ -11,7 +11,20 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$GlinerVersion = "0.2.29"
+$repo = Split-Path -Parent $PSScriptRoot
+$GlinerVersionFile = Join-Path $repo "tools\gliner-runtime\VERSION"
+
+if (-not (Test-Path -LiteralPath $GlinerVersionFile)) {
+    throw "GLiNER VERSION-Datei fehlt: $GlinerVersionFile"
+}
+
+$GlinerVersion = (
+    Get-Content -LiteralPath $GlinerVersionFile -Raw -Encoding UTF8
+).Trim()
+
+if ([string]::IsNullOrWhiteSpace($GlinerVersion)) {
+    throw "GLiNER VERSION-Datei ist leer."
+}
 $TorchVersionCPU = "2.14.0+cpu"
 $TorchVersionCUDA = "2.14.0+cu126"
 
