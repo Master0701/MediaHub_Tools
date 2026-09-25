@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)]
     [ValidateSet("cpu", "cuda")]
     [string]$Variant,
@@ -6,7 +6,7 @@
     [Parameter(Mandatory = $true)]
     [string]$Destination,
 
-    [string]$Python = "python"
+    [string]$Python
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,12 +42,48 @@ if (Test-Path $destinationPath) {
 
 New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
 
-Write-Host "Pruefe Python..."
-& $Python --version
+Write-Host "Pruefe Python 3.12..."
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Python konnte nicht gestartet werden."
+if ([string]::IsNullOrWhiteSpace($Python)) {
+    $Python = (& py -3.12 -c "import sys; print(sys.executable)")
+
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Python)) {
+        throw "Python 3.12 wurde nicht gefunden. Installiere es mit: py install 3.12"
+    }
+
+    $Python = $Python.Trim()
 }
+
+if (-not (Test-Path -LiteralPath $Python)) {
+    throw "Python-Interpreter wurde nicht gefunden: $Python"
+}
+
+$pythonInfo = (& $Python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}|{sys.implementation.cache_tag}|{sys.executable}')")
+
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($pythonInfo)) {
+    throw "Python konnte nicht korrekt gestartet werden."
+}
+
+$pythonInfo = $pythonInfo.Trim()
+$pythonParts = $pythonInfo.Split("|")
+
+if ($pythonParts.Count -ne 3) {
+    throw "Python-Versionspruefung lieferte ein unerwartetes Ergebnis: $pythonInfo"
+}
+
+$pythonVersion = $pythonParts[0]
+$pythonCacheTag = $pythonParts[1]
+$pythonExecutable = $pythonParts[2]
+
+if ($pythonVersion -ne "3.12" -or $pythonCacheTag -ne "cpython-312") {
+    throw "Falsches Python fuer GLiNER: $pythonVersion / $pythonCacheTag. Erforderlich ist CPython 3.12."
+}
+
+$Python = $pythonExecutable
+
+Write-Host "OK - CPython 3.12 erkannt."
+Write-Host "Interpreter: $Python"
+Write-Host "ABI:         $pythonCacheTag"
 
 Write-Host ""
 Write-Host "Aktualisiere pip..."

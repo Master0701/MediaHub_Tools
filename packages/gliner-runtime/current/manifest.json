@@ -1,18 +1,18 @@
-{
+﻿{
     "tool":  "gliner-runtime",
-    "version":  "0.2.29",
+    "version":  "0.2.30",
     "platform":  "windows",
     "architecture":  "x64",
     "packages":  {
                      "cpu":  {
                                  "package":  "GLiNER-Runtime-Windows-x64-CPU.zip",
-                                 "sha256":  "838658aa555821dc3ad09a25956466f9adfdabc1eaba3dabb90fc1753cb09e29",
+                                 "sha256":  "90796467ba0d15453d80718741785e937b3832a2c04f4b1f5fa459fab83bc3c0",
                                  "torch_version":  "2.14.0+cpu",
                                  "acceleration":  "cpu"
                              },
                      "cuda":  {
                                   "package":  "GLiNER-Runtime-Windows-x64-CUDA.zip",
-                                  "sha256":  "7afa158b5c8304f092dc28b272deb5a92470907173db7c7175e497b059963d9f",
+                                  "sha256":  "66205c6f3382a44214b57659b95db58b0c83dfba6d5baee3bdd24184f40efc4e",
                                   "torch_version":  "2.14.0+cu126",
                                   "cuda_version":  "12.6",
                                   "acceleration":  "nvidia-cuda",
@@ -21,18 +21,18 @@
                                                 {
                                                     "file":  "GLiNER-Runtime-Windows-x64-CUDA.zip.part001",
                                                     "size":  1610612736,
-                                                    "sha256":  "544776559f9828f14aea1e5f990a1a810f2b8f663a212cd95b77cb3ea5deb31f"
+                                                    "sha256":  "f39deead519d082833482a7d5bbc6b7ebc381ed17801e754e3eeae194c90cfac"
                                                 },
                                                 {
                                                     "file":  "GLiNER-Runtime-Windows-x64-CUDA.zip.part002",
-                                                    "size":  1034774070,
-                                                    "sha256":  "5c339438b3d5f232a08884d791de07bd12761a0e1abfefce6072adbb009b35e9"
+                                                    "size":  1034788980,
+                                                    "sha256":  "ed8ca5825bc1eac80a4bd1860a333bf629fa016d67ec6b7d883e3194d425fb13"
                                                 }
                                             ],
-                                  "size":  2645386806
+                                  "size":  2645401716
                               }
                  },
     "source_project":  "urchade/GLiNER",
     "source_model":  "urchade/gliner_multi-v2.1",
-    "built_at_utc":  "2026-09-22T16:02:57.7189989Z"
+    "built_at_utc":  "2026-09-25T13:14:50.8387160Z"
 }

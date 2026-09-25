@@ -416,6 +416,7 @@ $releaseFiles = @(
     ".github/workflows/gliner.yml",
     ".gitignore",
     "packages/gliner-runtime/current/manifest.json",
+    "scripts/prepare_gliner_source.ps1",
     "scripts/build_gliner_runtime.ps1",
     "scripts/release_gliner_runtime.ps1"
 )
