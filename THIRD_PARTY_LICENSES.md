@@ -58,3 +58,25 @@ MediaHub Tools ist nicht Hersteller oder Eigentümer der oben genannten Drittanb
 Alle Urheberrechte, Markenrechte, Lizenzrechte und sonstigen Rechte verbleiben vollständig bei den jeweiligen Entwicklern und Rechteinhabern.
 
 Die ursprünglichen Lizenz- und Nutzungsbedingungen gelten unverändert weiter.
+
+## SmolVLM2 500M Video Instruct
+
+- **Component:** SmolVLM2-500M-Video-Instruct model
+- **Upstream:** HuggingFaceTB/SmolVLM2-500M-Video-Instruct
+- **Developer / provider:** Hugging Face
+- **License:** Apache-2.0
+- **Bundled in MediaHub plugin:** No
+- **Distribution:** Separate MediaHub Tools model package
+- **Targets:** Windows Compute Node and Raspberry Pi AI Node
+- **Pinned revision:** `7b375e1b73b11138ff12fe22c8f2822d8fe03467`
+- **Upstream model page:** https://huggingface.co/HuggingFaceTB/SmolVLM2-500M-Video-Instruct
+
+The upstream SmolVLM2 checkpoints are released under the Apache License 2.0.
+
+MediaHub packages the model separately from the `.mhaiplugin`. Platform-
+specific Python, PyTorch, CUDA and other runtime dependencies are not part of
+this model package and retain their respective upstream licenses.
+
+See:
+
+`tools/smolvlm2-model/THIRD_PARTY_NOTICE.md`

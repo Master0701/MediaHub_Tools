@@ -63,3 +63,22 @@ MediaHub Tools enthält bzw. verarbeitet Software und Modelle anderer Projekte.
 Die jeweiligen Urheberrechte, Markenrechte und Lizenzrechte verbleiben bei den ursprünglichen Entwicklern und Rechteinhabern.
 
 Weitere Angaben befinden sich in `THIRD_PARTY_LICENSES.md`.
+
+## SmolVLM2 model package
+
+MediaHub Tools provides the external model package for the MediaHub
+SmolVLM2 AI-Node plugin.
+
+Model:
+
+`HuggingFaceTB/SmolVLM2-500M-Video-Instruct`
+
+The model package is shared between supported Windows Compute Nodes and
+Raspberry Pi AI Nodes. Node-specific runtimes are installed separately.
+
+The model is pinned to a known upstream revision and all packaged files are
+verified using SHA256 checksums.
+
+The SmolVLM2 model is licensed under Apache-2.0. See
+`THIRD_PARTY_LICENSES.md` and
+`tools/smolvlm2-model/THIRD_PARTY_NOTICE.md`.

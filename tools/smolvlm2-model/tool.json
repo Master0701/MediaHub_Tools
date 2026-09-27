@@ -1,0 +1,21 @@
+﻿{
+    "id":  "smolvlm2-model",
+    "display_name":  "SmolVLM2 500M Video Instruct Model",
+    "source_repository":  "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+    "model_repository":  "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+    "model_revision":  "7b375e1b73b11138ff12fe22c8f2822d8fe03467",
+    "package_version":  "0.1.0",
+    "platforms":  [
+                      "windows-amd64",
+                      "linux-aarch64"
+                  ],
+    "node_targets":  [
+                         "windows_compute",
+                         "raspberry_pi"
+                     ],
+    "storage":  "mediahub_tools",
+    "model_files_shared":  true,
+    "runtime_bundled":  false,
+    "license":  "Apache-2.0",
+    "retained_versions":  2
+}
