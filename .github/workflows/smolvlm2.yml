@@ -1,0 +1,89 @@
+﻿name: SmolVLM2 Model Release-Hinweis
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-hinweis:
+    runs-on: windows-latest
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v5
+
+      - name: SmolVLM2 Release-Hinweis
+        shell: powershell
+        run: |
+          $versionFile = ".\packages\smolvlm2-model\current\VERSION"
+          $manifestFile = ".\packages\smolvlm2-model\current\manifest.json"
+          $toolFile = ".\tools\smolvlm2-model\tool.json"
+
+          if (-not (Test-Path $versionFile)) {
+            throw "VERSION fehlt."
+          }
+
+          if (-not (Test-Path $manifestFile)) {
+            throw "manifest.json fehlt."
+          }
+
+          if (-not (Test-Path $toolFile)) {
+            throw "tool.json fehlt."
+          }
+
+          $version = (
+            Get-Content $versionFile -Raw -Encoding UTF8
+          ).Trim()
+
+          $manifest = Get-Content `
+            $manifestFile `
+            -Raw -Encoding UTF8 |
+            ConvertFrom-Json
+
+          $tool = Get-Content `
+            $toolFile `
+            -Raw -Encoding UTF8 |
+            ConvertFrom-Json
+
+          if ($manifest.tool -ne "smolvlm2-model") {
+            throw "Falsches Tool im Manifest."
+          }
+
+          if ($manifest.version -ne $version) {
+            throw "VERSION und Manifest-Version stimmen nicht ueberein."
+          }
+
+          if ($manifest.license -ne "Apache-2.0") {
+            throw "Unerwartete Modelllizenz."
+          }
+
+          if ($tool.id -ne "smolvlm2-model") {
+            throw "Falsche Tool-ID."
+          }
+
+          if ($tool.package_version -ne $version) {
+            throw "Tool- und Paketversion stimmen nicht ueberein."
+          }
+
+          if ($tool.model_revision -ne $manifest.revision) {
+            throw "Modellrevision stimmt nicht ueberein."
+          }
+
+          Write-Host ""
+          Write-Host "SmolVLM2 Model Package $version"
+          Write-Host ""
+          Write-Host "Dieser Workflow erstellt absichtlich kein Release."
+          Write-Host ""
+          Write-Host "Das SmolVLM2-Modell wird lokal gebaut und mit"
+          Write-Host "scripts\release_smolvlm2_model.ps1"
+          Write-Host "verifiziert und im gemeinsamen MediaHub-Tools-Release"
+          Write-Host "'mediahub-tools' veroeffentlicht."
+          Write-Host ""
+          Write-Host "Grund:"
+          Write-Host "Die grossen Modell-Quelldateien liegen lokal vor und"
+          Write-Host "sind nicht Bestandteil eines frischen GitHub-Actions-Checkouts."
+          Write-Host ""
+          Write-Host "Das gemeinsame Release darf bestehende Tesseract-,"
+          Write-Host "GLiNER- und andere Tool-Assets nicht entfernen."
