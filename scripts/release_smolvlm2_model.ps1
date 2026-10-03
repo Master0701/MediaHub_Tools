@@ -534,6 +534,26 @@ foreach ($asset in $assets) {
 }
 
 # ------------------------------------------------------------
+# Gemeinsamen Release-Text aktualisieren
+# ------------------------------------------------------------
+
+Write-Host ""
+Write-Host "=== GEMEINSAMEN RELEASE-TEXT AKTUALISIEREN ==="
+
+$sharedReleaseScript = Join-Path $PSScriptRoot "update_shared_release.ps1"
+
+if (-not (Test-Path -LiteralPath $sharedReleaseScript)) {
+    throw "STOP: Zentrales Shared-Release-Script fehlt: $sharedReleaseScript"
+}
+
+& $sharedReleaseScript -ReleaseTag $releaseTag
+
+if ($LASTEXITCODE -ne 0) {
+    throw "STOP: Zentrales Shared-Release-Script ist fehlgeschlagen."
+}
+
+Write-Host ""
+# ------------------------------------------------------------
 # Abschlusskontrolle
 # ------------------------------------------------------------
 

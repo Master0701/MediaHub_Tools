@@ -759,6 +759,21 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
+Write-Host "=== RELEASE-TEXT AKTUALISIEREN ==="
+
+$sharedReleaseScript = Join-Path $PSScriptRoot "update_shared_release.ps1"
+
+if (-not (Test-Path -LiteralPath $sharedReleaseScript)) {
+    throw "Zentrales Shared-Release-Script fehlt: $sharedReleaseScript"
+}
+
+& $sharedReleaseScript -ReleaseTag $sharedTag
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Zentrales Shared-Release-Script ist fehlgeschlagen."
+}
+
+Write-Host ""
 Write-Host "=== GEMEINSAMEN RELEASE PRUEFEN ==="
 
 $afterJson = gh release view $sharedTag --json assets
