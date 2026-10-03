@@ -1,18 +1,19 @@
 ﻿{
     "tool":  "gliner-runtime",
     "version":  "0.2.30",
-    "platform":  "windows",
-    "architecture":  "x64",
     "packages":  {
                      "cpu":  {
                                  "package":  "GLiNER-Runtime-Windows-x64-CPU.zip",
-                                 "sha256":  "90796467ba0d15453d80718741785e937b3832a2c04f4b1f5fa459fab83bc3c0",
+                                 "sha256":  "94a363243d2d4a4466fc2cf65a363ded1c38c7fe1fa2d6aa1b2435ee19fb7b71",
                                  "torch_version":  "2.14.0+cpu",
-                                 "acceleration":  "cpu"
+                                 "acceleration":  "cpu",
+                                 "platform":  "windows",
+                                 "architecture":  "x64",
+                                 "size":  167579141
                              },
                      "cuda":  {
                                   "package":  "GLiNER-Runtime-Windows-x64-CUDA.zip",
-                                  "sha256":  "66205c6f3382a44214b57659b95db58b0c83dfba6d5baee3bdd24184f40efc4e",
+                                  "sha256":  "b51cb8e571e0e8edda9dc9b0aca7bc81ab502168816d0d90a334052789173ac6",
                                   "torch_version":  "2.14.0+cu126",
                                   "cuda_version":  "12.6",
                                   "acceleration":  "nvidia-cuda",
@@ -21,18 +22,39 @@
                                                 {
                                                     "file":  "GLiNER-Runtime-Windows-x64-CUDA.zip.part001",
                                                     "size":  1610612736,
-                                                    "sha256":  "f39deead519d082833482a7d5bbc6b7ebc381ed17801e754e3eeae194c90cfac"
+                                                    "sha256":  "984752d780308e13c0594a1252d8e95233173cccdae523065d202d25c893f2c3"
                                                 },
                                                 {
                                                     "file":  "GLiNER-Runtime-Windows-x64-CUDA.zip.part002",
-                                                    "size":  1034788980,
-                                                    "sha256":  "ed8ca5825bc1eac80a4bd1860a333bf629fa016d67ec6b7d883e3194d425fb13"
+                                                    "size":  1035730587,
+                                                    "sha256":  "5a6b0b8cfbce6d2d340c0ebeaaee05b97a32f07767d0285ab6c3f9660c33ba91"
                                                 }
                                             ],
-                                  "size":  2645401716
-                              }
+                                  "size":  2646343323,
+                                  "platform":  "windows",
+                                  "architecture":  "x64"
+                              },
+                     "pi":  {
+                                "package":  "GLiNER-Runtime-Linux-ARM64-CPU.zip",
+                                "sha256":  "82c9b0d91c4a320fb98bd3f56a24c7c5f605cd5027b7f8ef77990ba1cc4331f6",
+                                "torch_version":  "2.14.0+cpu",
+                                "acceleration":  "cpu",
+                                "platform":  "linux",
+                                "architecture":  "arm64",
+                                "size":  210625558
+                            }
                  },
     "source_project":  "urchade/GLiNER",
     "source_model":  "urchade/gliner_multi-v2.1",
-    "built_at_utc":  "2026-09-25T13:14:50.8387160Z"
+    "built_at_utc":  "2026-10-03T12:12:41.1118001Z",
+    "model":  {
+                  "package":  "GLiNER-Model-gliner_multi-v2.1.zip",
+                  "sha256":  "2e6c17533283cb7667e9585f46635c6706cfe878fc30513086a4914f2ce458e5",
+                  "size":  921139198,
+                  "repository":  "urchade/gliner_multi-v2.1",
+                  "format":  "safetensors",
+                  "weight_file":  "model.safetensors",
+                  "shared":  true
+              },
+    "gliner_version":  "0.2.29"
 }

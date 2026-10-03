@@ -1,6 +1,6 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("cpu", "cuda")]
+    [ValidateSet("cpu", "cuda", "pi")]
     [string]$Variant,
 
     [Parameter(Mandatory = $true)]
@@ -12,24 +12,30 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repo = Split-Path -Parent $PSScriptRoot
-$GlinerVersionFile = Join-Path $repo "tools\gliner-runtime\VERSION"
+$GlinerVersionFile = Join-Path $repo "tools\gliner-runtime\GLINER_VERSION"
 
 if (-not (Test-Path -LiteralPath $GlinerVersionFile)) {
-    throw "GLiNER VERSION-Datei fehlt: $GlinerVersionFile"
+    throw "GLiNER Paket-Versionsdatei fehlt: $GlinerVersionFile"
 }
 
 $GlinerVersion = (
-    Get-Content -LiteralPath $GlinerVersionFile -Raw -Encoding UTF8
+    Get-Content `
+        -LiteralPath $GlinerVersionFile `
+        -Raw `
+        -Encoding UTF8
 ).Trim()
 
 if ([string]::IsNullOrWhiteSpace($GlinerVersion)) {
     throw "GLiNER VERSION-Datei ist leer."
 }
-$TorchVersionCPU = "2.14.0+cpu"
-$TorchVersionCUDA = "2.14.0+cu126"
 
-$TorchIndexCPU = "https://download.pytorch.org/whl/cpu"
+$TorchVersionCPU  = "2.14.0+cpu"
+$TorchVersionCUDA = "2.14.0+cu126"
+$TorchVersionPI   = "2.14.0+cpu"
+
+$TorchIndexCPU  = "https://download.pytorch.org/whl/cpu"
 $TorchIndexCUDA = "https://download.pytorch.org/whl/cu126"
+$TorchIndexPI   = "https://download.pytorch.org/whl/cpu"
 
 if ([System.IO.Path]::IsPathRooted($Destination)) {
     $destinationPath = [System.IO.Path]::GetFullPath($Destination)
@@ -55,50 +61,103 @@ if (Test-Path $destinationPath) {
 
 New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
 
-Write-Host "Pruefe Python 3.12..."
+if ($Variant -eq "pi") {
+    Write-Host "Pruefe Python 3.13 fuer Linux ARM64..."
 
-if ([string]::IsNullOrWhiteSpace($Python)) {
-    $Python = (& py -3.12 -c "import sys; print(sys.executable)")
-
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Python)) {
-        throw "Python 3.12 wurde nicht gefunden. Installiere es mit: py install 3.12"
+    if ($IsWindows) {
+        throw (
+            "Die PI-Quell-Runtime muss auf Linux ARM64/aarch64 erzeugt werden. " +
+            "Sie darf nicht mit Windows-Python gebaut werden."
+        )
     }
 
-    $Python = $Python.Trim()
+    $architecture = (& uname -m).Trim()
+
+    if ($architecture -ne "aarch64" -and $architecture -ne "arm64") {
+        throw "Falsche Architektur fuer PI-Runtime: $architecture"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Python)) {
+        $Python = (& which python3).Trim()
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Python)) {
+        throw "Python 3 wurde auf dem PI nicht gefunden."
+    }
+
+    $pythonInfo = (& $Python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}|{sys.implementation.cache_tag}|{sys.executable}')")
+
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($pythonInfo)) {
+        throw "Python konnte nicht korrekt gestartet werden."
+    }
+
+    $pythonParts = $pythonInfo.Trim().Split("|")
+
+    if ($pythonParts.Count -ne 3) {
+        throw "Python-Versionspruefung lieferte ein unerwartetes Ergebnis: $pythonInfo"
+    }
+
+    $pythonVersion = $pythonParts[0]
+    $pythonCacheTag = $pythonParts[1]
+    $pythonExecutable = $pythonParts[2]
+
+    if ($pythonVersion -ne "3.13" -or $pythonCacheTag -ne "cpython-313") {
+        throw (
+            "Falsches Python fuer GLiNER PI: " +
+            "$pythonVersion / $pythonCacheTag. Erforderlich ist CPython 3.13."
+        )
+    }
+
+    $Python = $pythonExecutable
+
+    Write-Host "OK - CPython 3.13 / ARM64 erkannt."
+}
+else {
+    Write-Host "Pruefe Python 3.12..."
+
+    if ([string]::IsNullOrWhiteSpace($Python)) {
+        $Python = (& py -3.12 -c "import sys; print(sys.executable)")
+
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Python)) {
+            throw "Python 3.12 wurde nicht gefunden. Installiere es mit: py install 3.12"
+        }
+
+        $Python = $Python.Trim()
+    }
+
+    if (-not (Test-Path -LiteralPath $Python)) {
+        throw "Python-Interpreter wurde nicht gefunden: $Python"
+    }
+
+    $pythonInfo = (& $Python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}|{sys.implementation.cache_tag}|{sys.executable}')")
+
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($pythonInfo)) {
+        throw "Python konnte nicht korrekt gestartet werden."
+    }
+
+    $pythonParts = $pythonInfo.Trim().Split("|")
+
+    if ($pythonParts.Count -ne 3) {
+        throw "Python-Versionspruefung lieferte ein unerwartetes Ergebnis: $pythonInfo"
+    }
+
+    $pythonVersion = $pythonParts[0]
+    $pythonCacheTag = $pythonParts[1]
+    $pythonExecutable = $pythonParts[2]
+
+    if ($pythonVersion -ne "3.12" -or $pythonCacheTag -ne "cpython-312") {
+        throw "Falsches Python fuer GLiNER: $pythonVersion / $pythonCacheTag. Erforderlich ist CPython 3.12."
+    }
+
+    $Python = $pythonExecutable
+
+    Write-Host "OK - CPython 3.12 erkannt."
 }
 
-if (-not (Test-Path -LiteralPath $Python)) {
-    throw "Python-Interpreter wurde nicht gefunden: $Python"
-}
-
-$pythonInfo = (& $Python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}|{sys.implementation.cache_tag}|{sys.executable}')")
-
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($pythonInfo)) {
-    throw "Python konnte nicht korrekt gestartet werden."
-}
-
-$pythonInfo = $pythonInfo.Trim()
-$pythonParts = $pythonInfo.Split("|")
-
-if ($pythonParts.Count -ne 3) {
-    throw "Python-Versionspruefung lieferte ein unerwartetes Ergebnis: $pythonInfo"
-}
-
-$pythonVersion = $pythonParts[0]
-$pythonCacheTag = $pythonParts[1]
-$pythonExecutable = $pythonParts[2]
-
-if ($pythonVersion -ne "3.12" -or $pythonCacheTag -ne "cpython-312") {
-    throw "Falsches Python fuer GLiNER: $pythonVersion / $pythonCacheTag. Erforderlich ist CPython 3.12."
-}
-
-$Python = $pythonExecutable
-
-Write-Host "OK - CPython 3.12 erkannt."
 Write-Host "Interpreter: $Python"
 Write-Host "ABI:         $pythonCacheTag"
-
 Write-Host ""
+
 Write-Host "Aktualisiere pip..."
 & $Python -m pip install --upgrade pip
 
@@ -106,13 +165,21 @@ if ($LASTEXITCODE -ne 0) {
     throw "pip konnte nicht aktualisiert werden."
 }
 
-if ($Variant -eq "cpu") {
-    $torchVersion = $TorchVersionCPU
-    $torchIndex = $TorchIndexCPU
-}
-else {
-    $torchVersion = $TorchVersionCUDA
-    $torchIndex = $TorchIndexCUDA
+switch ($Variant) {
+    "cpu" {
+        $torchVersion = $TorchVersionCPU
+        $torchIndex = $TorchIndexCPU
+    }
+
+    "cuda" {
+        $torchVersion = $TorchVersionCUDA
+        $torchIndex = $TorchIndexCUDA
+    }
+
+    "pi" {
+        $torchVersion = $TorchVersionPI
+        $torchIndex = $TorchIndexPI
+    }
 }
 
 Write-Host ""
@@ -155,6 +222,8 @@ Write-Host "Installiere GLiNER-Abhaengigkeiten..."
     "safetensors==0.8.0" `
     "tqdm==4.70.1" `
     "sentencepiece==0.2.2" `
+    "protobuf==7.36.2" `
+    "tiktoken" `
     "pyyaml==6.0.3" `
     "regex==2026.9.10" `
     "tokenizers==0.23.2" `
@@ -189,6 +258,8 @@ $required = @(
     "tokenizers",
     "safetensors",
     "sentencepiece",
+    "protobuf",
+    "tiktoken",
     "numpy"
 )
 
@@ -206,6 +277,29 @@ foreach ($package in $required) {
 
     Write-Host "OK: $package"
 }
+
+Write-Host ""
+Write-Host "Pruefe installierte GLiNER-Version..."
+
+$expectedGlinerDist = "gliner-$GlinerVersion.dist-info"
+
+$actualGlinerDist = @(
+    Get-ChildItem `
+        $destinationPath `
+        -Directory `
+        -Filter "gliner-*.dist-info" `
+        -ErrorAction SilentlyContinue
+)
+
+if ($actualGlinerDist.Count -ne 1) {
+    throw "Unerwartete Anzahl GLiNER-Distributionen: $($actualGlinerDist.Count)"
+}
+
+if ($actualGlinerDist[0].Name -ne $expectedGlinerDist) {
+    throw "GLiNER-Version stimmt nicht: erwartet $expectedGlinerDist, gefunden $($actualGlinerDist[0].Name)"
+}
+
+Write-Host "OK: $($actualGlinerDist[0].Name)"
 
 Write-Host ""
 Write-Host "Distributionen:"
@@ -232,5 +326,3 @@ Write-Host "========================================"
 Write-Host "Variant: $Variant"
 Write-Host "Source:  $destinationPath"
 Write-Host "========================================"
-
-

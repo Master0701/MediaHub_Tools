@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("cpu", "cuda")]
+    [ValidateSet("cpu", "cuda", "pi")]
     [string]$Variant,
 
     [Parameter(Mandatory = $true)]
@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
 $work = Join-Path $repo "work\gliner-runtime\$Variant"
 $release = Join-Path $repo "release\gliner-runtime"
-$GlinerVersionFile = Join-Path $repo "tools\gliner-runtime\VERSION"
+$GlinerVersionFile = Join-Path $repo "tools\gliner-runtime\GLINER_VERSION"
 
 if (-not (Test-Path -LiteralPath $GlinerVersionFile)) {
     throw "GLiNER VERSION-Datei fehlt: $GlinerVersionFile"
@@ -381,7 +381,9 @@ $requiredPackages = @(
     "huggingface_hub",
     "tokenizers",
     "safetensors",
-    "sentencepiece"
+    "sentencepiece",
+    "tiktoken",
+    "google"
 )
 
 foreach ($package in $requiredPackages) {
@@ -415,6 +417,20 @@ else {
     "cpu"
 }
 
+$platform = if ($Variant -eq "pi") {
+    "linux"
+}
+else {
+    "windows"
+}
+
+$architecture = if ($Variant -eq "pi") {
+    "arm64"
+}
+else {
+    "x64"
+}
+
 # Altes Manifest darf die Groessenberechnung nicht beeinflussen.
 
 $manifestPath = Join-Path `
@@ -438,8 +454,8 @@ $manifest = [ordered]@{
     schema_version = 1
     tool = "gliner-runtime"
     variant = $Variant
-    platform = "windows"
-    architecture = "x64"
+    platform = $platform
+    architecture = $architecture
     gliner_version = $GlinerVersion
     torch_version = $torchVersion
     acceleration = $acceleration
@@ -483,6 +499,9 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $packageName = if ($Variant -eq "cuda") {
     "GLiNER-Runtime-Windows-x64-CUDA.zip"
+}
+elseif ($Variant -eq "pi") {
+    "GLiNER-Runtime-Linux-ARM64-CPU.zip"
 }
 else {
     "GLiNER-Runtime-Windows-x64-CPU.zip"
@@ -562,6 +581,7 @@ try {
         "tokenizers/",
         "safetensors/",
         "sentencepiece/",
+        "tiktoken/",
         "mediahub-runtime.json"
     )
 
@@ -751,12 +771,77 @@ if ($Variant -eq "cuda") {
 
     Write-Host ""
     Write-Host "CUDA-Parts: $($parts.Count)"
-    Write-Host "CUDA-MULTIPART + SHA256 ERZEUGT"
+    # --------------------------------------------------------
+    # Gemeinsames Release-Manifest mit dem echten CUDA-Build
+    # aktualisieren
+    # --------------------------------------------------------
+
+    $sharedManifestPath = Join-Path `
+        $repo `
+        "packages\gliner-runtime\current\manifest.json"
+
+    if (-not (Test-Path -LiteralPath $sharedManifestPath)) {
+        throw "Gemeinsames GLiNER-Manifest fehlt: $sharedManifestPath"
+    }
+
+    $sharedManifest = Get-Content `
+        -LiteralPath $sharedManifestPath `
+        -Raw `
+        -Encoding UTF8 |
+        ConvertFrom-Json
+
+    if ($null -eq $sharedManifest.packages.cuda) {
+        throw "CUDA-Eintrag fehlt im gemeinsamen GLiNER-Manifest."
+    }
+
+    $manifestParts = @()
+
+    foreach ($part in $parts) {
+
+        $actualPartHash = (
+            Get-FileHash `
+                -LiteralPath $part.FullName `
+                -Algorithm SHA256
+        ).Hash.ToLowerInvariant()
+
+        $manifestParts += [ordered]@{
+            file   = $part.Name
+            size   = [int64]$part.Length
+            sha256 = $actualPartHash
+        }
+    }
+
+    $sharedManifest.packages.cuda.package = $packageName
+    $sharedManifest.packages.cuda.sha256 = $packageHash
+    $sharedManifest.packages.cuda.size = [int64]$packageSize
+    $sharedManifest.packages.cuda.multipart = $true
+    $sharedManifest.packages.cuda.parts = @($manifestParts)
+
+    $sharedManifest.built_at_utc = [DateTime]::UtcNow.ToString("o")
+
+    $sharedManifest |
+        ConvertTo-Json -Depth 20 |
+        Set-Content `
+            -LiteralPath $sharedManifestPath `
+            -Encoding UTF8
+
+    Write-Host ""
+    Write-Host "Gemeinsames Manifest aktualisiert:"
+    Write-Host "  CUDA ZIP: $packageSize Bytes"
+    Write-Host "  CUDA SHA: $packageHash"
+
+    foreach ($entry in $manifestParts) {
+        Write-Host (
+            "  {0}: {1} Bytes / {2}" -f `
+            $entry.file,
+            $entry.size,
+            $entry.sha256
+        )
+    }
+
+    Write-Host "CUDA-MULTIPART + SHA256 + MANIFEST ERZEUGT"
 }
 
 Write-Host "RELEASE-ZIP + SHA256 ERZEUGT"
 Write-Host "========================================"
-
-
-
 

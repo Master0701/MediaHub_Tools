@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$PreflightOnly,
     [switch]$Release
 )
@@ -240,6 +240,184 @@ Remove-Item `
 # Release Assets
 # ------------------------------------------------------------
 
+# ------------------------------------------------------------
+# Linux ARM64 / Raspberry Pi
+# ------------------------------------------------------------
+
+Write-Host ""
+Write-Host "=== LINUX ARM64 / PI PRUEFEN ==="
+
+$pi = $manifest.packages.pi
+
+if ($null -eq $pi) {
+    throw "Pi-Paket fehlt im Manifest."
+}
+
+$piPath = Join-Path $releaseRoot $pi.package
+$piHashPath = "$piPath.sha256"
+
+foreach ($path in @($piPath, $piHashPath)) {
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "Pi-Datei fehlt: $path"
+    }
+}
+
+$piFile = Get-Item -LiteralPath $piPath
+
+if ([int64]$piFile.Length -ne [int64]$pi.size) {
+    throw "Pi-Paketgroesse stimmt nicht."
+}
+
+$piHash = (
+    Get-FileHash `
+        -LiteralPath $piPath `
+        -Algorithm SHA256
+).Hash.ToLowerInvariant()
+
+if ($piHash -ne $pi.sha256.ToLowerInvariant()) {
+    throw "Pi-Gesamthash stimmt nicht."
+}
+
+$piStoredHash = (
+    Get-Content `
+        -LiteralPath $piHashPath `
+        -Raw `
+        -Encoding ASCII
+).Trim().Split()[0].ToLowerInvariant()
+
+if ($piStoredHash -ne $piHash) {
+    throw "Pi-SHA256-Datei stimmt nicht."
+}
+
+if ($pi.platform -ne "linux") {
+    throw "Pi-Plattform im Manifest ist nicht linux."
+}
+
+if ($pi.architecture -ne "arm64") {
+    throw "Pi-Architektur im Manifest ist nicht arm64."
+}
+
+Write-Host "OK - Linux ARM64 / Pi"
+Write-Host "Groesse: $($piFile.Length)"
+Write-Host "SHA256:  $piHash"
+
+# ------------------------------------------------------------
+# Gemeinsames GLiNER-Modell
+# ------------------------------------------------------------
+
+Write-Host ""
+Write-Host "=== GEMEINSAMES GLINER-MODELL PRUEFEN ==="
+
+$model = $manifest.model
+
+if ($null -eq $model) {
+    throw "Modell fehlt im Manifest."
+}
+
+$modelPath = Join-Path $releaseRoot $model.package
+$modelHashPath = "$modelPath.sha256"
+
+foreach ($path in @($modelPath, $modelHashPath)) {
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "Modell-Datei fehlt: $path"
+    }
+}
+
+$modelFile = Get-Item -LiteralPath $modelPath
+
+if ([int64]$modelFile.Length -ne [int64]$model.size) {
+    throw "Modell-Paketgroesse stimmt nicht."
+}
+
+$modelHash = (
+    Get-FileHash `
+        -LiteralPath $modelPath `
+        -Algorithm SHA256
+).Hash.ToLowerInvariant()
+
+if ($modelHash -ne $model.sha256.ToLowerInvariant()) {
+    throw "Modell-Gesamthash stimmt nicht."
+}
+
+$modelStoredHash = (
+    Get-Content `
+        -LiteralPath $modelHashPath `
+        -Raw `
+        -Encoding ASCII
+).Trim().Split()[0].ToLowerInvariant()
+
+if ($modelStoredHash -ne $modelHash) {
+    throw "Modell-SHA256-Datei stimmt nicht."
+}
+
+if ($model.format -ne "safetensors") {
+    throw "Modellformat ist nicht safetensors."
+}
+
+if ($model.weight_file -ne "model.safetensors") {
+    throw "Unerwartete Modell-Gewichtsdatei."
+}
+
+if ($model.shared -ne $true) {
+    throw "Modell ist nicht als shared markiert."
+}
+
+Write-Host ""
+Write-Host "=== MODELL-ZIP-INHALT PRUEFEN ==="
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$zip = [System.IO.Compression.ZipFile]::OpenRead($modelPath)
+
+try {
+    $zipNames = @(
+        $zip.Entries |
+            ForEach-Object {
+                $_.FullName.Replace('\', '/')
+            }
+    )
+
+    $safeTensorEntries = @(
+        $zipNames |
+            Where-Object {
+                $_ -eq "model.safetensors" -or
+                $_ -like "*/model.safetensors"
+            }
+    )
+
+    $pytorchBinEntries = @(
+        $zipNames |
+            Where-Object {
+                $_ -eq "pytorch_model.bin" -or
+                $_ -like "*/pytorch_model.bin"
+            }
+    )
+
+    if ($safeTensorEntries.Count -ne 1) {
+        throw "Modell-ZIP muss genau eine model.safetensors enthalten. Gefunden: $($safeTensorEntries.Count)"
+    }
+
+    if ($pytorchBinEntries.Count -ne 0) {
+        throw "STOP: pytorch_model.bin befindet sich im Modell-ZIP."
+    }
+
+    Write-Host "OK - model.safetensors vorhanden:"
+    $safeTensorEntries | ForEach-Object {
+        Write-Host "  $_"
+    }
+
+    Write-Host "OK - pytorch_model.bin nicht vorhanden."
+}
+finally {
+    $zip.Dispose()
+}
+Write-Host "OK - gemeinsames GLiNER-Modell"
+Write-Host "Groesse: $($modelFile.Length)"
+Write-Host "SHA256:  $modelHash"
+$assets += $piPath
+$assets += $piHashPath
+$assets += $modelPath
+$assets += $modelHashPath
 $assets += $manifestPath
 $assets += $versionPath
 $assets += $licensePath
@@ -390,6 +568,10 @@ $glinerAssetNames = @(
     "GLiNER-Runtime-Windows-x64-CUDA.zip.part001.sha256",
     "GLiNER-Runtime-Windows-x64-CUDA.zip.part002",
     "GLiNER-Runtime-Windows-x64-CUDA.zip.part002.sha256",
+    "GLiNER-Runtime-Linux-ARM64-CPU.zip",
+    "GLiNER-Runtime-Linux-ARM64-CPU.zip.sha256",
+    "GLiNER-Model-gliner_multi-v2.1.zip",
+    "GLiNER-Model-gliner_multi-v2.1.zip.sha256",
     "gliner-manifest.json"
 )
 
@@ -414,6 +596,7 @@ foreach ($name in $protectedBefore) {
 # Nur die vorgesehenen Dateien committen.
 $releaseFiles = @(
     ".github/workflows/gliner.yml",
+    ".gitattributes",
     ".gitignore",
     "packages/gliner-runtime/current/VERSION",
     "packages/gliner-runtime/current/manifest.json",
@@ -421,9 +604,11 @@ $releaseFiles = @(
     "packages/gliner-runtime/current/GLiNER-Runtime-Windows-x64-CUDA.zip.sha256",
     "scripts/prepare_gliner_source.ps1",
     "scripts/build_gliner_runtime.ps1",
+    "scripts/build_gliner_runtime_pi.sh",
     "scripts/release_gliner_runtime.ps1",
     "tools/gliner-runtime/tool.json",
-    "tools/gliner-runtime/VERSION"
+    "tools/gliner-runtime/VERSION",
+    "tools/gliner-runtime/GLINER_VERSION"
 )
 
 Write-Host ""
@@ -535,7 +720,11 @@ Copy-Item `
 
 $releaseAssets = @(
     $cpuPath,
-    $cpuHashPath
+    $cpuHashPath,
+    $piPath,
+    $piHashPath,
+    $modelPath,
+    $modelHashPath
 )
 
 foreach ($entry in $parts) {
@@ -612,12 +801,19 @@ $requiredSharedAssets = @(
     "Tesseract-Projekt.zip",
     "Tesseract-Projekt.zip.sha256",
     "tesseract-manifest.json",
+    "SmolVLM2-500M-Video-Instruct-v0.1.0.zip",
+    "SmolVLM2-500M-Video-Instruct-v0.1.0.zip.sha256",
+    "smolvlm2-model-manifest.json",
     "GLiNER-Runtime-Windows-x64-CPU.zip",
     "GLiNER-Runtime-Windows-x64-CPU.zip.sha256",
     "GLiNER-Runtime-Windows-x64-CUDA.zip.part001",
     "GLiNER-Runtime-Windows-x64-CUDA.zip.part001.sha256",
     "GLiNER-Runtime-Windows-x64-CUDA.zip.part002",
     "GLiNER-Runtime-Windows-x64-CUDA.zip.part002.sha256",
+    "GLiNER-Runtime-Linux-ARM64-CPU.zip",
+    "GLiNER-Runtime-Linux-ARM64-CPU.zip.sha256",
+    "GLiNER-Model-gliner_multi-v2.1.zip",
+    "GLiNER-Model-gliner_multi-v2.1.zip.sha256",
     "gliner-manifest.json",
     "THIRD_PARTY_LICENSES.md"
 )
