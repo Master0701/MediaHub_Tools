@@ -8,3 +8,9 @@ release/
 packages/gliner-runtime/**/*.zip
 temp/
 packages/gliner-runtime/**/*.zip.part*
+
+# Portable Python-Runtime wird als GitHub-Release-Asset
+# veroeffentlicht, nicht als Git-Repository-Datei.
+# Tool-Metadaten, Manifeste und Lizenztexte bleiben versioniert.
+packages/python/*.zip
+packages/python/*.zip.sha256

@@ -1,0 +1,30 @@
+{
+    "id":  "python-runtime",
+    "display_name":  "MediaHub Portable Python Runtime",
+    "software":  "CPython",
+    "python_version":  "3.12.10",
+    "package_version":  "0.1.0",
+    "developer":  "Python Software Foundation",
+    "upstream_build_provider":  "Astral",
+    "source_repository":  "astral-sh/python-build-standalone",
+    "source_url":  "https://github.com/astral-sh/python-build-standalone",
+    "upstream_archive":  "cpython-3.12.10+20250409-x86_64-pc-windows-msvc-install_only.tar.gz",
+    "package_name":  "MediaHub-Python-3.12.10-x64.zip",
+    "package_path":  "packages/python/MediaHub-Python-3.12.10-x64.zip",
+    "package_sha256":  "e1f891ef60245148ab41593d7600a5430b6549a450d67329702bd700926902f8",
+    "platform":  "windows",
+    "architecture":  "x64",
+    "node_targets":  [
+                         "windows_compute"
+                     ],
+    "installation_type":  "portable",
+    "system_installation":  false,
+    "license":  "PSF-2.0",
+    "license_file":  "licenses/python-runtime/CPython-LICENSE.txt",
+    "third_party_licenses":  [
+                                 "licenses/python-runtime/pip-LICENSE.txt",
+                                 "licenses/python-runtime/TclTk-license.terms",
+                                 "licenses/python-runtime/TclTk-demos-license.terms"
+                             ],
+    "retained_versions":  2
+}

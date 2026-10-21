@@ -1,4 +1,4 @@
-﻿# Drittanbieter-Software und Rechte
+# Drittanbieter-Software und Rechte
 
 ## Tesseract OCR
 
@@ -80,3 +80,72 @@ this model package and retain their respective upstream licenses.
 See:
 
 `tools/smolvlm2-model/THIRD_PARTY_NOTICE.md`
+
+## Portable Python Runtime 3.12.10 (Windows x64)
+
+- **Software:** CPython 3.12.10
+- **Originalprojekt:** Python Software Foundation
+- **Originalquelle:** https://www.python.org/
+- **Lizenz:** Python Software Foundation License Version 2 sowie die in der Original-Lizenzdatei genannten weiteren Bedingungen
+- **Portabler Windows-Build:** Astral / python-build-standalone
+- **Build-Projekt:** https://github.com/astral-sh/python-build-standalone
+- **Verwendetes Upstream-Archiv:** `cpython-3.12.10+20250409-x86_64-pc-windows-msvc-install_only.tar.gz`
+- **MediaHub-Paket:** `packages/python/MediaHub-Python-3.12.10-x64.zip`
+- **Zielplattform:** Windows x64
+- **Verwendung:** Gemeinsame portable Python-Laufzeit fuer MediaHub Windows Compute Node und kompatible AI-Node-Plugins
+- **Installation:** Lokal und parallel zu vorhandenen Python-Installationen; keine systemweite Python-Installation
+
+### Enthaltene Lizenzdateien
+
+Die Original-Lizenztexte sind im Python-Paket enthalten und zusaetzlich unter `licenses/python-runtime/` abgelegt:
+
+- `CPython-LICENSE.txt` - CPython und zugehoerige Lizenzbedingungen
+- `pip-LICENSE.txt` - pip 24.3.1
+- `TclTk-license.terms` - Tcl/Tk
+- `TclTk-demos-license.terms` - Tcl/Tk-Demodateien
+
+### Microsoft Visual C++ Runtime (Windows x64)
+
+- **Hersteller / Rechteinhaber:** Microsoft Corporation
+- **Enthaltene Dateien:** `vcruntime140.dll`, `vcruntime140_1.dll`
+- **Dateiversion im geprüften Paket:** 14.42.34438.0
+- **Herkunft:** Im unveraenderten portablen Windows-Python-Build von Astral enthalten
+- **Lizenz:** Microsoft Software License Terms / anwendbare Visual-Studio-Redistributable-Bedingungen; keine Open-Source-Lizenz
+- **Microsoft-Dokumentation:** https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files?view=msvc-170
+- **Microsoft-Lizenzverzeichnis:** https://visualstudio.microsoft.com/license-terms/
+
+Die beiden DLLs bleiben Bestandteil des originalen Python-Laufzeitpakets. Die
+Microsoft-Signaturen der Dateien wurden geprueft. Eine gueltige Signatur ist
+jedoch kein eigenstaendiger Nachweis eines Weitergaberechts. Microsoft knuepft
+die Weitergabe der Visual-C++-Runtime-Dateien an die jeweils anwendbaren
+Lizenzbedingungen und die erforderliche Lizenzierung des Weitergebenden.
+Dieser Hinweis dokumentiert die enthaltenen Komponenten und erteilt keine
+zusaetzliche Lizenz. Vor oeffentlicher Weitergabe muss die Berechtigung des
+Verteilers geklaert sein. Microsoft-Marken und Copyright-Hinweise bleiben
+unveraendert.
+
+### Astral python-build-standalone
+
+- **Build-Projekt:** https://github.com/astral-sh/python-build-standalone
+- **Projektlizenz des Build-Werkzeugs:** Mozilla Public License 2.0 (MPL-2.0)
+- **Projekt-Lizenztext:** https://github.com/astral-sh/python-build-standalone/blob/main/LICENSE
+- **Build-Artefakt:** `cpython-3.12.10+20250409-x86_64-pc-windows-msvc-install_only.tar.gz`
+
+Die MPL-2.0-Angabe betrifft das Build-Projekt und ersetzt nicht die einzelnen
+Lizenzen des daraus erzeugten CPython-Pakets, seiner Bibliotheken oder der
+Microsoft-Laufzeitdateien. Es gelten jeweils die Originalbedingungen.
+
+Das Python-Paket kann weitere Drittanbieterkomponenten und Windows-Laufzeitbibliotheken enthalten. Deren Original-Lizenz- und Weitergabebedingungen gelten weiterhin, einschliesslich etwaiger Bedingungen fuer Microsoft-Laufzeitdateien.
+
+MediaHub Tools ist weder Hersteller von CPython noch des portablen Astral-Builds. Alle Rechte verbleiben bei den jeweiligen Rechteinhabern.
+
+### CPython Windows Binary Redistribution Conditions
+
+- **Originalquelle:** https://github.com/python/cpython/blob/main/PC/crtlicense.txt
+- **Lokale Lizenzdatei:** `licenses/python-runtime/CPython-Windows-CRT-LICENSE.txt`
+- **Geltungsbereich:** Microsoft Distributable Code in Windows-Python-Binaerdateien
+- **Weitergabe:** Nur unter Einhaltung der im Originaltext genannten Bedingungen.
+- **Marken und Urheberrechte:** Originalhinweise duerfen nicht entfernt oder veraendert werden.
+- **Plattform:** Microsoft-Laufzeitkomponenten ausschliesslich fuer die erlaubten Microsoft-Plattformen.
+- **Empfaenger:** Auch nachgelagerte Verteiler und Endnutzer muessen die einschlaegigen Schutzbedingungen beachten.
+

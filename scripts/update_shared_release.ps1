@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$ReleaseTag = "mediahub-tools"
 )
 
@@ -9,11 +9,13 @@ $Root = Split-Path -Parent $PSScriptRoot
 $tesseractManifestPath = Join-Path $Root "packages\tesseract\current\manifest.json"
 $glinerManifestPath    = Join-Path $Root "packages\gliner-runtime\current\manifest.json"
 $smolvlmManifestPath   = Join-Path $Root "packages\smolvlm2-model\current\manifest.json"
+$pythonManifestPath    = Join-Path $Root "packages\python\current\manifest.json"
 
 foreach ($manifestPath in @(
     $tesseractManifestPath,
     $glinerManifestPath,
-    $smolvlmManifestPath
+    $smolvlmManifestPath,
+    $pythonManifestPath
 )) {
     if (-not (Test-Path -LiteralPath $manifestPath)) {
         throw "Manifest fehlt: $manifestPath"
@@ -38,16 +40,26 @@ $smolvlmManifest = Get-Content `
     -Encoding UTF8 |
     ConvertFrom-Json
 
+$pythonManifest = Get-Content `
+    -LiteralPath $pythonManifestPath `
+    -Raw `
+    -Encoding UTF8 |
+    ConvertFrom-Json
+
 $tesseractVersion = [string]$tesseractManifest.version
 $runtimeVersion   = [string]$glinerManifest.version
 $glinerVersion    = [string]$glinerManifest.gliner_version
 $smolvlmVersion   = [string]$smolvlmManifest.version
+$pythonVersion    = [string]$pythonManifest.python_version
+$pythonPackageVersion = [string]$pythonManifest.version
 
 foreach ($versionInfo in @(
     @{ Name = "Tesseract"; Value = $tesseractVersion },
     @{ Name = "GLiNER Runtime"; Value = $runtimeVersion },
     @{ Name = "GLiNER"; Value = $glinerVersion },
-    @{ Name = "SmolVLM2"; Value = $smolvlmVersion }
+    @{ Name = "SmolVLM2"; Value = $smolvlmVersion },
+    @{ Name = "Python Runtime"; Value = $pythonVersion },
+    @{ Name = "Python Runtime Paket"; Value = $pythonPackageVersion }
 )) {
     if ([string]::IsNullOrWhiteSpace($versionInfo.Value)) {
         throw "$($versionInfo.Name)-Version fehlt im Manifest."
@@ -61,8 +73,60 @@ Write-Host "Tesseract:          $tesseractVersion"
 Write-Host "GLiNER Runtime:     $runtimeVersion"
 Write-Host "GLiNER:             $glinerVersion"
 Write-Host "SmolVLM2:           $smolvlmVersion"
+Write-Host "Python Runtime:     $pythonVersion"
+Write-Host "Python Paket:       $pythonPackageVersion"
 Write-Host ""
 
+# Python nur als veroeffentlicht auffuehren, wenn alle
+# zugehoerigen Assets im gemeinsamen GitHub-Release liegen.
+$releaseInfoJson = & gh release view $ReleaseTag --json assets
+
+switch ($LASTEXITCODE -eq 0) {
+    $false { throw "GitHub-Release-Assets konnten nicht gelesen werden." }
+}
+
+$releaseInfo = $releaseInfoJson | ConvertFrom-Json
+$publishedAssetNames = @(
+    $releaseInfo.assets | ForEach-Object { $_.name }
+)
+
+$pythonRequiredAssets = @(
+    [string]$pythonManifest.package,
+    "$($pythonManifest.package).sha256",
+    "python-runtime-manifest.json"
+)
+
+$pythonMissingAssets = @(
+    $pythonRequiredAssets |
+        Where-Object { $_ -notin $publishedAssetNames }
+)
+
+$pythonSection = ""
+
+switch ($pythonMissingAssets.Count -eq 0) {
+    $true {
+        $pythonSection = @"
+
+## Portable Python Runtime
+
+Python-Version: $pythonVersion
+Paketversion: $pythonPackageVersion
+
+- Windows x64 / Windows Compute Node
+- Portabler CPython-Build aus astral-sh/python-build-standalone
+- MediaHub-Paket: $($pythonManifest.package)
+- SHA256-Pruefsumme
+- eigenes Python-Manifest
+- Original-Lizenzdateien und Drittanbieterhinweise
+
+"@
+        Write-Host "Python-Assets vollstaendig: Abschnitt wird aufgenommen."
+    }
+    $false {
+        Write-Host "Python noch nicht vollstaendig veroeffentlicht."
+        Write-Host "Python-Abschnitt wird ausgelassen."
+    }
+}
 $releaseBodyPath = Join-Path $env:TEMP "mediahub-tools-release.md"
 
 $releaseBody = @"
@@ -101,6 +165,8 @@ Version: $smolvlmVersion
 - gemeinsames Modellpaket fuer beide Plattformen
 - SHA256-Pruefsumme
 - eigenes Modell-Manifest
+
+$pythonSection
 
 ## Lizenzen
 

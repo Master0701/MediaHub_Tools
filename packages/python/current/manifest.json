@@ -1,0 +1,17 @@
+{
+    "tool":  "python-runtime",
+    "version":  "0.1.0",
+    "python_version":  "3.12.10",
+    "package":  "MediaHub-Python-3.12.10-x64.zip",
+    "sha256":  "e1f891ef60245148ab41593d7600a5430b6549a450d67329702bd700926902f8",
+    "size":  43260658,
+    "release_tag":  "mediahub-tools",
+    "platform":  "windows",
+    "architecture":  "x64",
+    "targets":  [
+                    "windows_compute"
+                ],
+    "source_project":  "astral-sh/python-build-standalone",
+    "license":  "PSF-2.0",
+    "license_notice":  "THIRD_PARTY_LICENSES.md"
+}
