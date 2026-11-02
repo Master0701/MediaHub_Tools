@@ -1,8 +1,8 @@
 ﻿{
     "tool":  "tesseract",
-    "version":  "5.5.3",
+    "version":  "5.5.4",
     "package":  "Tesseract-Projekt.zip",
-    "sha256":  "3c8760739050834b7a23dc067867918589d12f63acec24f92004b048757a0e61",
+    "sha256":  "d15f7556fee91b3f33925fb49b87cb9468a0ce34ee6831da7550eebee62aa4c7",
     "release_tag":  "mediahub-tools",
-    "built_at_utc":  "2026-09-24T15:56:05.1894921Z"
+    "built_at_utc":  "2026-11-02T12:35:09.0617707Z"
 }
