@@ -1,15 +1,21 @@
-param(
-    [string]$ReleaseTag = "mediahub-tools"
+﻿param(
+    [string]$ReleaseTag = "mediahub-tools",
+    [string]$SourceRoot = "",
+    [string]$WorkRoot = "D:\eigenes program\cheti sicherungs datein\ki chet",
+    [switch]$PreviewOnly,
+    [string]$InteraktionsManifestOverride = ""
 )
 
 $ErrorActionPreference = "Stop"
 
-$Root = Split-Path -Parent $PSScriptRoot
+$Root = if ($SourceRoot) { $SourceRoot } else { Split-Path -Parent $PSScriptRoot }
+$GitHubRepo = "Master0701/MediaHub_Tools"
 
 $tesseractManifestPath = Join-Path $Root "packages\tesseract\current\manifest.json"
 $glinerManifestPath    = Join-Path $Root "packages\gliner-runtime\current\manifest.json"
 $smolvlmManifestPath   = Join-Path $Root "packages\smolvlm2-model\current\manifest.json"
 $pythonManifestPath    = Join-Path $Root "packages\python\current\manifest.json"
+$interaktionsManifestPath = if ($InteraktionsManifestOverride) { $InteraktionsManifestOverride } else { Join-Path $Root "packages\interaktions-ki\current\manifest.json" }
 
 foreach ($manifestPath in @(
     $tesseractManifestPath,
@@ -79,7 +85,7 @@ Write-Host ""
 
 # Python nur als veroeffentlicht auffuehren, wenn alle
 # zugehoerigen Assets im gemeinsamen GitHub-Release liegen.
-$releaseInfoJson = & gh release view $ReleaseTag --json assets
+$releaseInfoJson = & gh release view $ReleaseTag --repo $GitHubRepo --json assets
 
 switch ($LASTEXITCODE -eq 0) {
     $false { throw "GitHub-Release-Assets konnten nicht gelesen werden." }
@@ -127,7 +133,38 @@ Paketversion: $pythonPackageVersion
         Write-Host "Python-Abschnitt wird ausgelassen."
     }
 }
-$releaseBodyPath = Join-Path $env:TEMP "mediahub-tools-release.md"
+$interaktionsSection = ""
+if (Test-Path -LiteralPath $interaktionsManifestPath) {
+    $interaktionsManifest = Get-Content -LiteralPath $interaktionsManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([string]$interaktionsManifest.tool -ne 'interaktions-ki') { throw 'Interaktions-KI-Manifest: falscher Tool-Typ.' }
+    $interaktionsAssets = @(
+        [string]$interaktionsManifest.runtime.packages.cpu.package,
+        [string]$interaktionsManifest.runtime.packages.cuda.package,
+        [string]$interaktionsManifest.model.package,
+        'interaktions-ki-manifest.json'
+    )
+    $missingInteraktionsAssets = @($interaktionsAssets | Where-Object { $_ -notin $publishedAssetNames })
+    if ($missingInteraktionsAssets.Count -eq 0) {
+        $interaktionsSection = @"
+## Interaktions-KI: llama.cpp und Qwen3
+
+- Paketversion: $($interaktionsManifest.version)
+
+- llama.cpp: $($interaktionsManifest.runtime.version), Windows x64 CPU und CUDA $($interaktionsManifest.runtime.packages.cuda.cuda_version)
+- Qwen3: $($interaktionsManifest.model.name), GGUF
+- CPU: $($interaktionsManifest.runtime.packages.cpu.package)
+- CUDA: $($interaktionsManifest.runtime.packages.cuda.package)
+- Modell: $($interaktionsManifest.model.package)
+- Manifest: interaktions-ki-manifest.json
+- SHA256-Pruefsummen und Lizenzhinweise
+
+"@
+        Write-Host 'Interaktions-KI-Assets vollstaendig: Abschnitt wird aufgenommen.'
+    } else {
+        Write-Host "Interaktions-KI-Assets fehlen: $($missingInteraktionsAssets -join ', ')"
+    }
+}
+$releaseBodyPath = if ($PreviewOnly) { Join-Path $WorkRoot 'MediaHub_Tools_Release_Vorschau_Final.md' } else { Join-Path $env:TEMP 'mediahub-tools-release.md' }
 
 $releaseBody = @"
 # MediaHub Tools
@@ -168,6 +205,8 @@ Version: $smolvlmVersion
 
 $pythonSection
 
+$interaktionsSection
+
 ## Lizenzen
 
 Die zentrale THIRD_PARTY_LICENSES.md enthaelt die Hinweise
@@ -178,26 +217,16 @@ Updateprozessen aktualisiert. Ein Tool darf dabei die
 Assets anderer Tools nicht entfernen.
 "@
 
+Set-Content -LiteralPath $releaseBodyPath -Value $releaseBody -Encoding UTF8 -NoNewline
+if ($PreviewOnly) {
+    Write-Host "VORSCHAU: $releaseBodyPath"
+    Write-Host 'Keine GitHub-Aenderung.'
+    return
+}
 try {
-    Set-Content `
-        -LiteralPath $releaseBodyPath `
-        -Value $releaseBody `
-        -Encoding UTF8 `
-        -NoNewline
-
-    & gh release edit $ReleaseTag `
-        --title "MediaHub Tools" `
-        --notes-file $releaseBodyPath
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "Gemeinsamer Release-Text konnte nicht aktualisiert werden."
-    }
+    & gh release edit $ReleaseTag --repo $GitHubRepo --title 'MediaHub Tools' --notes-file $releaseBodyPath
+    if ($LASTEXITCODE -ne 0) { throw 'Gemeinsamer Release-Text konnte nicht aktualisiert werden.' }
+} finally {
+    Remove-Item -LiteralPath $releaseBodyPath -Force -ErrorAction SilentlyContinue
 }
-finally {
-    Remove-Item `
-        -LiteralPath $releaseBodyPath `
-        -Force `
-        -ErrorAction SilentlyContinue
-}
-
-Write-Host "OK - gemeinsamer Release-Text aktualisiert."
+Write-Host 'OK - gemeinsamer Release-Text aktualisiert.'
