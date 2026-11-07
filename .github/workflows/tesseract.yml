@@ -204,3 +204,10 @@ jobs:
               throw "Repository-Aktualisierung fehlgeschlagen."
             }
           }
+      - name: Gemeinsames Release nach Tesseract-Build abschliessen
+        if: steps.version.outputs.needs_build == 'true'
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          .\scripts\finalize_shared_release.ps1 -SyncTag
