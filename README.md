@@ -1,4 +1,4 @@
-﻿# MediaHub Tools
+# MediaHub Tools
 
 Dieses Repository erstellt und archiviert Windows-Werkzeugpakete und externe Laufzeitkomponenten für MediaHub.
 
@@ -82,3 +82,20 @@ verified using SHA256 checksums.
 The SmolVLM2 model is licensed under Apache-2.0. See
 `THIRD_PARTY_LICENSES.md` and
 `tools/smolvlm2-model/THIRD_PARTY_NOTICE.md`.
+
+## Portable Python Runtime
+
+- Python 3.12.10, Paketversion 0.1.0, Windows x64 / Compute Node
+- Eigenes Manifest: `packages/python/current/manifest.json`
+- Paket, SHA256 und `python-runtime-manifest.json` im gemeinsamen Release `mediahub-tools`
+- GitHub Actions: `Python Runtime - Paketpruefung` (Pruefung, kein automatischer Upload)
+
+## Interaktions-KI (llama.cpp / Qwen3)
+
+- Release-Paketversion 0.1.0; lokales Entwicklungsmanifest kann `0.1.0-dev` bleiben
+- llama.cpp b12125 fuer Windows x64 CPU und CUDA 12.4
+- Qwen3-1.7B-Q8_0 als GGUF-Modell
+- Manifest: `packages/interaktions-ki/current/manifest.json`
+- Sieben Assets (drei ZIPs, drei SHA256-Dateien, Manifest) im gemeinsamen Release `mediahub-tools`
+- GitHub Actions: `Interaktions-KI - Paketpruefung` (Pruefung, kein automatischer Upload)
+- Veroeffentlichung erfolgt ueber `scripts/release_interaktions_ki_gesamt.ps1`

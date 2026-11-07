@@ -1,0 +1,38 @@
+name: Python Runtime - Paketpruefung
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'packages/python/**'
+      - '.github/workflows/python-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+      - name: Python-Manifest und Release-Assets pruefen
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $p = 'packages/python/current/manifest.json'
+          if (!(Test-Path $p)) { throw "Manifest fehlt: $p" }
+          $m = Get-Content $p -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($m.tool -ne 'python-runtime') { throw 'Falsche Tool-ID' }
+          if (!$m.python_version -or !$m.version -or !$m.package -or !$m.sha256) { throw 'Unvollstaendiges Manifest' }
+          if ($m.sha256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'Ungueltiger SHA256-Wert' }
+          $r = gh release view mediahub-tools --repo Master0701/MediaHub_Tools --json assets | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Release nicht erreichbar' }
+          $names = @($r.assets | ForEach-Object name)
+          foreach ($n in @($m.package, ($m.package + '.sha256'), 'python-runtime-manifest.json')) {
+            if ($n -notin $names) { throw "Release-Asset fehlt: $n" }
+          }
+          Write-Host "OK: Python $($m.python_version), Paket $($m.version), Assets vorhanden"
+          Write-Host 'Keine Dateien hochgeladen oder veraendert.'

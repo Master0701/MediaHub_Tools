@@ -1,0 +1,38 @@
+{
+  "tool": "interaktions-ki",
+  "version": "0.1.0-dev",
+  "status": "local-development",
+  "targets": [
+    "windows_compute"
+  ],
+  "platforms": [
+    "windows-amd64"
+  ],
+  "runtime": {
+    "engine": "llama.cpp",
+    "version": "b12125",
+    "packages": {
+      "cpu": {
+        "package": "MediaHub-llama-cpp-Windows-x64-CPU-b12125.zip",
+        "sha256": "f4755c9e0c8a813e8ad8c1b8357ec419ed9441abd9bb4bfddacdec4c3820efe9",
+        "acceleration": "cpu"
+      },
+      "cuda": {
+        "package": "MediaHub-llama-cpp-Windows-x64-CUDA12.4-b12125.zip",
+        "sha256": "3447b0b56030998e3163dbe4f1a648769ad364aef8ac08763d84df52d5945006",
+        "acceleration": "nvidia-cuda",
+        "cuda_version": "12.4"
+      }
+    }
+  },
+  "model": {
+    "name": "Qwen3-1.7B-Q8_0",
+    "package": "MediaHub-Qwen3-1.7B-Q8_0-90862c4.zip",
+    "sha256": "056f6d3b027080c2e6dc7baf8e2dbaaf816a093f91169358da2508a8f6cf84dc",
+    "format": "gguf",
+    "revision_short": "90862c4"
+  },
+  "archive_location": "tools/interaktions-ki",
+  "installation": "local-only-explicit-approval",
+  "note": "Metadatenentwurf; kein automatischer Downloader oder Installer angeschlossen."
+}

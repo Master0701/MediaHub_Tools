@@ -1,0 +1,42 @@
+name: Interaktions-KI - Paketpruefung
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'packages/interaktions-ki/**'
+      - '.github/workflows/interaktions-ki.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+      - name: Interaktions-KI-Manifest und Release-Assets pruefen
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $p = 'packages/interaktions-ki/current/manifest.json'
+          if (!(Test-Path $p)) { throw "Manifest fehlt: $p" }
+          $m = Get-Content $p -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($m.tool -ne 'interaktions-ki') { throw 'Falsche Tool-ID' }
+          $entries = @($m.runtime.packages.cpu, $m.runtime.packages.cuda, $m.model)
+          $r = gh release view mediahub-tools --repo Master0701/MediaHub_Tools --json assets | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Release nicht erreichbar' }
+          $names = @($r.assets | ForEach-Object name)
+          foreach ($e in $entries) {
+            if (!$e.package -or $e.sha256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'Ungueltiger Paketeintrag' }
+            foreach ($n in @($e.package, ($e.package + '.sha256'))) {
+              if ($n -notin $names) { throw "Release-Asset fehlt: $n" }
+            }
+          }
+          if ('interaktions-ki-manifest.json' -notin $names) { throw 'Release-Manifest fehlt' }
+          Write-Host 'OK: llama.cpp CPU/CUDA, Qwen3 und sieben Release-Assets vorhanden.'
+          Write-Host 'Entwicklungsmanifest darf 0.1.0-dev enthalten; Release-Manifest ist separat 0.1.0.'
+          Write-Host 'Keine Dateien hochgeladen oder veraendert.'
